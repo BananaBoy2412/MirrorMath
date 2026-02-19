@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MirrorMath - Master Math with a Reflection</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <!-- KaTeX CSS and JS for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      transition: background-color 0.3s ease;
+    }
+
+    .dark body {
+      background-color: #020617;
+    }
+
+    .blueprint-grid {
+      background-image:
+        linear-gradient(to right, #E0F2FE 1px, transparent 1px),
+        linear-gradient(to bottom, #E0F2FE 1px, transparent 1px);
+      background-size: 40px 40px;
+      background-attachment: fixed;
+    }
+
+    .dark .blueprint-grid {
+      background-image:
+        linear-gradient(to right, #1e293b 1px, transparent 1px),
+        linear-gradient(to bottom, #1e293b 1px, transparent 1px);
+    }
+
+    .math-grid {
+      background-image:
+        radial-gradient(#E0F2FE 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    .dark .math-grid {
+      background-image:
+        radial-gradient(#1e293b 1px, transparent 1px);
+    }
+
+    .math-font {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(186, 230, 253, 0.4);
+      box-shadow: 0 8px 32px 0 rgba(186, 230, 253, 0.3);
+    }
+
+    .dark .glass-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(30, 41, 59, 0.5);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    }
+
+    .a4-page {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 20mm;
+      margin: 20px auto;
+      background: white;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+    }
+
+    .dark .a4-page {
+      background: #f8fafc;
+      /* Keep paper light even in dark mode for readability or export preview */
+      color: #0f172a;
+    }
+
+    @media (max-width: 210mm) {
+      .a4-page {
+        width: 95%;
+        padding: 10mm;
+      }
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    .dark ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #bae6fd;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #7dd3fc;
+    }
+
+    .hero-gradient {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    }
+
+    .dark .hero-gradient {
+      background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+    }
+
+    .cta-gradient {
+      background: linear-gradient(to right, #38bdf8, #2563eb);
+    }
+
+    /* Utilities */
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .mask-fade-right {
+      mask-image: linear-gradient(to right, black 90%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
+        "react": "https://esm.sh/react@^19.2.4",
+        "react-dom": "https://esm.sh/react-dom@^19.2.4",
+        "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+        "framer-motion": "https://esm.sh/framer-motion@^11.0.8",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+        "react/": "https://esm.sh/react@^19.2.4/"
+      }
+    }
+    </script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body class="selection:bg-sky-200">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

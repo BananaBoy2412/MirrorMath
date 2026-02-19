@@ -1,0 +1,7 @@
+{
+  "name": "MirrorMath",
+  "description": "A minimalist SaaS landing page for a smart math worksheet generator that 'mirrors' existing assignments.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
