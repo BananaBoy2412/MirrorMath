@@ -1349,14 +1349,13 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
 
       {viewMode === 'preview' && worksheet.elements ? (
         <div className="flex justify-center p-4 md:p-12 bg-slate-100/50 dark:bg-slate-900/30 rounded-[32px] md:rounded-[48px] border border-slate-200 dark:border-slate-800 overflow-hidden min-h-[500px] md:min-h-[900px]">
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute inset-0 flex items-center justify-center bg-black/5 z-10 pointer-events-none" />
-          <div className="transform scale-[0.25] origin-top-left w-[794px] h-[1123px] pointer-events-none bg-white">
-            {/* Thumbnail Preview */}
+          <div className="origin-top shadow-2xl border border-slate-200 transition-transform" style={{ transform: isMobile ? `scale(${window.innerWidth / 850})` : 'scale(0.75)' }}>
             <WorksheetPreview
               elements={worksheet.elements || []}
               originalImageUrl={worksheet.originalImageUrl}
+              showAnswers={showAnswers}
               layoutMode={worksheet.type === 'Mirror' ? 'flow' : 'absolute'}
-              title={worksheet.title} // PASS TITLE HERE
+              title={worksheet.title}
             />
           </div>
         </div>
