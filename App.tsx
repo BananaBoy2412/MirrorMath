@@ -1206,31 +1206,31 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
                   }`}
               >
                 <Layout size={14} />
-                <span className="hidden sm:inline">Sheet</span>
-                <span className="sm:hidden text-[10px]">Sheet</span>
+                <span className="hidden md:inline">Sheet</span>
+                <span className="md:hidden text-[10px]">Sheet</span>
               </button>
               <button
                 onClick={() => setViewMode('logic')}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${viewMode === 'logic' ? 'bg-white dark:bg-slate-700 text-sky-500 shadow-md ring-1 ring-slate-100 dark:ring-slate-600' : 'text-slate-500 hover:text-slate-700'
+                className={`flex items-center gap-2 px-3 md:px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${viewMode === 'logic' ? 'bg-white dark:bg-slate-700 text-sky-500 shadow-md ring-1 ring-slate-100 dark:ring-slate-600' : 'text-slate-500 hover:text-slate-700'
                   }`}
               >
                 <Activity size={14} />
-                <span className="hidden sm:inline">Logic</span>
-                <span className="sm:hidden text-[10px]">Logic</span>
+                <span className="hidden md:inline">Logic</span>
+                <span className="md:hidden text-[10px]">Logic</span>
               </button>
 
               <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
 
               <button
                 onClick={() => setShowAnswers(!showAnswers)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${showAnswers
+                className={`flex items-center gap-2 px-3 md:px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${showAnswers
                   ? 'bg-sky-500 text-white shadow-lg shadow-sky-200 dark:shadow-none'
                   : 'text-slate-500 hover:text-slate-700'
                   }`}
               >
                 {showAnswers ? <EyeOff size={14} /> : <Eye size={14} />}
-                <span className="hidden sm:inline">Answers</span>
-                <span className="sm:hidden text-[10px]">Ans</span>
+                <span className="hidden md:inline">Answers</span>
+                <span className="md:hidden text-[10px]">Ans</span>
               </button>
             </div>
           )}
@@ -1238,15 +1238,15 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
           <button
             onClick={handleDownloadPDF}
             disabled={isGenerating}
-            className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 px-5 py-2.5 rounded-2xl font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-sky-200 dark:hover:border-sky-900 transition-all disabled:opacity-50 group"
+            className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 px-3 md:px-5 py-2.5 rounded-2xl font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-sky-200 dark:hover:border-sky-900 transition-all disabled:opacity-50 group"
           >
             {isGenerating ? (
               <RefreshCw className="animate-spin text-sky-500" size={18} />
             ) : (
               <Download className="text-slate-400 group-hover:text-sky-500 transition-colors" size={18} />
             )}
-            <span className="hidden sm:inline">Download PDF</span>
-            <span className="sm:hidden text-xs">PDF</span>
+            <span className="hidden md:inline">Download PDF</span>
+            <span className="md:hidden text-xs">PDF</span>
           </button>
         </div>
       </div>
@@ -1427,61 +1427,7 @@ const MirrorWorkspace: React.FC<{
     try {
       const imagePart = await fileToGenerativePart(selectedFile);
 
-      const prompt = `
-        Analyze this worksheet and perform a precise structural and spatial parsing. 
-        CRITICAL: I need to reconstruct this worksheet EXACTLY as it appears. 
 
-        Identify every element on the page including:
-        - Header Labels (e.g., "Name:", "Date:", "Score:")
-        - Question numbers (e.g., "1.", "2)")
-        - Pure Math Problems (type: 'problem'). content MUST be a standalone equation (e.g. "x^2 + 5 = 10"). Do NOT put instructions or sentences here.
-        - Word Problems / Mixed Content (type: 'word_problem'). Use this for ANY content that contains words, sentences, or instructions.
-             CRITICAL: If the text contains math, wrap the math parts in LaTeX delimiters.
-             Use \\( ... \\) for inline math and \\\[ ... \\\] for block math.
-             Example: "Solve for \\(x\\) in the equation \\(y = mx + b\\)." NOT "$x$" or "x"
-        - Currency/Money: Use a plain $ sign (e.g., "$10.00"). DO NOT escape it with a backslash (no "\$").
-        - Diagrams or Graphs (CRITICAL: Only identify charts, graphs, or geometric figures ESSENTIAL to solving a problem. Do NOT include logos, clipart, or page borders).
-        - Section Headers (e.g., "Part A", "Geometry")
-        - Response Areas (CRITICAL: Identify ALL underlines '_______', empty boxes, or writing spaces intended for student answers. Extract as type 'response_area').
-        - Footer or instructions (type: 'instruction'). Treat same as 'word_problem' for mixed math/text.
-
-        LAYOUT RULES:
-        1. Bounding Boxes: Provide generous [ymin, xmin, ymax, xmax] boxes (normalized 0-1000). 
-           - CRITICAL: Math problems and Word Problems NEED vertical breathing room. Give them 30% MORE vertical height (ymin, ymax).
-           - CRITICAL: Question Numbers (e.g. "1.") MUST be kept separate from the Problem Text. Ensure their boxes do NOT overlap.
-           - IGNORE logos, school branding, or decorative images at the top/corners of the page.
-           - IGNORE copyright symbols (©), publisher names, website URLs, and page numbers at the bottom.
-           - Ensure the width (xmax-xmin) is wide enough to contain full content without clipping.
-           - If a problem has multiple lines, group them or ensure boxes are vertically aligned.
-        2. Visual Hierarchy: Detect font size (in pts), font weight (bold/normal), horizontal alignment (left/center/right), and font family (serif/sans-serif).
-        3. Mirroring:
-           - For every problem (math or word), generate a "Mirrored" version using different numbers/variables/scenarios but maintaining the same logic and difficulty.
-           - Return the mirrored problem in LaTeX for equations, or text for word problems.
-           - For diagrams, if possible, describe a mirrored version or keep the original description.
-           - For Response Areas, keep them as is (e.g. "__________" or "[Box]").
-           - Keep labels like "Name:" or "Date:" as they are.
-
-        GENERATE JSON:
-        Return strict JSON in this format:
-        {
-          "title": "Clear Title of Worksheet",
-          "elements": [
-            {
-              "id": "unique_id",
-              "type": "header" | "problem" | "question_number" | "white_space" | "instruction" | "word_problem" | "diagram" | "section_header" | "response_area",
-              "content": "Original text or LaTeX",
-              "mirroredContent": "New problem LaTeX/text or original label",
-              "boundingBox": [ymin, xmin, ymax, xmax],
-              "style": {
-                "fontSize": number,
-                "fontWeight": "normal" | "bold",
-                "alignment": "left" | "center" | "right",
-                "fontFamily": "serif" | "sans-serif"
-              }
-            }
-          ]
-        }
-      `;
 
       console.log("Starting AI analysis with spatial reasoning (Edge Function)...");
 
@@ -1515,37 +1461,57 @@ const MirrorWorkspace: React.FC<{
 
       console.log("AI result received");
 
-      const rawText = text.replace(/```json\n?|\n?```/g, '').trim();
-      // Sanitize JSON: Double escape backslashes that precede invalid escape characters (e.g. \s, \c)
-      // This prevents "SyntaxError: Bad escaped character"
-      const jsonStr = rawText.replace(/\\([^"\\/bfnrtu])/g, '\\\\$1');
+      // PARSE BLOCK FORMAT (Robust - No JSON Parse Errors)
+      const rawText = responseData.data;
 
-      let data;
-      try {
-        data = JSON.parse(jsonStr);
-      } catch (parseError) {
-        console.error("JSON parsing failed, attempting fallback:", rawText);
-        // Try to find any JSON array/object in the text if the block was missing
-        const jsonMatch = rawText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-        if (jsonMatch) {
-          try {
-            // Apply same sanitization to the extracted block
-            data = JSON.parse(jsonMatch[0].replace(/\\([^"\\/bfnrtu])/g, '\\\\$1'));
-          } catch (e) {
-            console.error("Fallback parsing failed");
-            throw new Error("Invalid AI response format: " + (parseError as any).message);
-          }
-        } else {
-          throw new Error("Invalid AI response format");
+      // 1. Extract Title
+      const titleMatch = rawText.match(/---TITLE---\s*\n?([\s\S]*?)(?=\n?---ELEMENT---|$)/);
+      const title = titleMatch ? titleMatch[1].trim() : selectedFile.name.split('.')[0] + ' Reflection';
+
+      // 2. Extract Elements
+      const elementBlocks = rawText.split('---ELEMENT---').slice(1);
+      const elements: any[] = elementBlocks.map((block: string, index: number) => {
+        const getField = (name: string) => {
+          const match = block.match(new RegExp(`${name}:\\s*([\\s\\S]*?)(?=\\n?(?:Type|Box|Content|Mirrored|Solution):|$)`, 'i'));
+          return match ? match[1].trim() : '';
+        };
+
+        const type = getField('Type') || 'problem';
+        const boxStr = getField('Box');
+        const content = getField('Content');
+        const mirrored = getField('Mirrored');
+        const solution = getField('Solution');
+
+        let boundingBox = [0, 0, 0, 0];
+        try {
+          if (boxStr) boundingBox = JSON.parse(boxStr);
+        } catch (e) {
+          console.warn("Failed to parse box:", boxStr);
         }
-      }
 
+        return {
+          id: `el_${Date.now()}_${index}`,
+          type: type.toLowerCase(),
+          content: content,
+          mirroredContent: mirrored || content,
+          solution: solution !== 'N/A' ? solution : '',
+          boundingBox: boundingBox,
+          style: {
+            fontSize: type === 'header' ? 12 : 14,
+            fontWeight: type === 'header' ? 'bold' : 'normal',
+            alignment: 'left',
+            fontFamily: 'sans-serif'
+          }
+        };
+      });
 
-      // Robustly extract elements
-      const elements = Array.isArray(data) ? data : (data.elements || []);
       if (elements.length === 0) {
-        console.warn("AI returned zero elements:", data);
+        console.warn("AI returned zero elements:", rawText);
+        throw new Error("No elements detected. Please try a clearer image.");
       }
+
+
+
       for (let i = 0; i <= elements.length; i++) {
         setScanningElements(elements.slice(0, i));
         setScanProgress(Math.floor((i / elements.length) * 100));
@@ -1554,7 +1520,7 @@ const MirrorWorkspace: React.FC<{
 
       const newWorksheet: Worksheet = {
         id: Date.now().toString(),
-        title: data.title || selectedFile.name.split('.')[0] + ' Reflection',
+        title: title,
         type: 'Mirror',
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         elements: elements,
@@ -1565,6 +1531,7 @@ const MirrorWorkspace: React.FC<{
             .map((el: any) => ({
               original: el.content,
               mirrored: el.mirroredContent || el.content,
+              solution: el.solution || '',
               skill: el.skill || 'Math Reflection'
             })),
           solution: "Generated by Layout-Aware Mirroring System"
