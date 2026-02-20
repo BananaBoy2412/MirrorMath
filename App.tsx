@@ -258,18 +258,7 @@ const Sidebar: React.FC<{
   ];
 
   return (
-    <div className={`h-full flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ${collapsed ? 'w-20' : 'w-64'}`}>
-      <div className="p-6 flex items-center gap-3">
-        <Logo size={32} />
-        {!collapsed && (
-          <div>
-            <h1 className="font-black text-xl tracking-tighter text-slate-900 dark:text-white">
-              Mirror<span className="text-sky-500">Math</span>
-            </h1>
 
-          </div>
-        )}
-      </div>
     <>
       {/* Desktop Sidebar */}
       <motion.aside
