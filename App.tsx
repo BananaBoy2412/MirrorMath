@@ -266,7 +266,7 @@ const Sidebar: React.FC<{
             <h1 className="font-black text-xl tracking-tighter text-slate-900 dark:text-white">
               Mirror<span className="text-sky-500">Math</span>
             </h1>
-            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">v1.0.1</span>
+
           </div>
         )}
       </div>
