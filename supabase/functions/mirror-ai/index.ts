@@ -105,19 +105,19 @@ serve(async (req) => {
 
         Generate exactly ${questionCount} distinct problems.
 
-        RETURN A RAW TEXT BLOCK using these exact delimiters.Do not use Markdown or JSON.
-
-            --- TITLE-- -
-                Creative Title Here
-            --- PROBLEM-- -
-                Type: problem
-            Content: \\frac{ 1 } { 2 } + \\frac{ 1 } { 3 }
-            Solution: \\(\\frac{ 5 } { 6 } \\)
---- PROBLEM-- -
-    Type: word_problem
-Content: A train leaves a station...
-Solution: 120 miles.Logic: Distance = Speed * Time.
-        --- PROBLEM-- -
+        RETURN A RAW TEXT BLOCK using these exact delimiters. Do not use Markdown or JSON.
+        
+        ---TITLE---
+        Creative Title Here
+        ---PROBLEM---
+        Type: problem
+        Content: \\frac{1}{2} + \\frac{1}{3}
+        Solution: \\( \\frac{5}{6} \\)
+        ---PROBLEM---
+        Type: word_problem
+        Content: A train leaves a station...
+        Solution: 120 miles. Logic: Distance = Speed * Time.
+        ---PROBLEM---
         ...
 
 RULES:

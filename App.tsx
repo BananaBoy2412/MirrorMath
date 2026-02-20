@@ -750,14 +750,25 @@ const ArchiveWorkspace: React.FC<{
 
 
 // --- Worksheet Preview Component ---
-const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[]; originalImageUrl?: string; showAnswers?: boolean }>(({ elements, originalImageUrl, showAnswers }, ref) => {
+const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[]; originalImageUrl?: string; showAnswers?: boolean; layoutMode?: 'absolute' | 'flow' }>(({ elements, originalImageUrl, showAnswers, layoutMode = 'absolute' }, ref) => {
   const pageWidth = 794; // A4 width at 96 DPI
   const pageHeight = 1123; // A4 height at 96 DPI
+
+  // Sort elements for flow layout to ensure they appear in reading order
+  const sortedElements = useMemo(() => {
+    if (layoutMode !== 'flow') return elements;
+    return [...elements].sort((a, b) => {
+      // Sort primarily by Y, secondarily by X
+      const yDiff = a.boundingBox[0] - b.boundingBox[0];
+      if (Math.abs(yDiff) > 10) return yDiff; // Semantic row difference
+      return a.boundingBox[1] - b.boundingBox[1];
+    });
+  }, [elements, layoutMode]);
 
   return (
     <div
       ref={ref}
-      className="relative bg-white mx-auto overflow-hidden text-slate-900"
+      className={`relative bg-white mx-auto overflow-hidden text-slate-900 ${layoutMode === 'flow' ? 'flex flex-col p-12 gap-6' : ''}`}
       style={{
         width: `${pageWidth}px`,
         height: `${pageHeight}px`,
@@ -768,150 +779,210 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
         WebkitFontSmoothing: 'antialiased'
       }}
     >
-      {/* Background Grid for Structure (Optional, can be toggled) */}
-      {/* <div className="absolute inset-0 pointer-events-none opacity-5" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div> */}
+      {layoutMode === 'flow' ? (
+        // --- FLOW LAYOUT (Professional List) ---
+        sortedElements.map((el, idx) => (
 
-      {elements.map((el, idx) => {
-        if (el.type === 'white_space') return null;
+          <div key={el.id || idx} className="w-full relative">
+            {/* Standard Element Rendering for Flow */}
+            {(() => {
+              const content = el.mirroredContent || el.content;
 
-        const [ymin, xmin, ymax, xmax] = el.boundingBox;
-        // Convert 0-1000 scale to strict INTEGER pixels for 100% stable alignment
-        const x = Math.round(xmin * 0.794);
-        const y = Math.round(ymin * 1.123);
-        const w = Math.round((xmax - xmin) * 0.794);
-        const h = Math.round((ymax - ymin) * 1.123);
+              if (el.type === 'header' || el.type === 'section_header') {
+                return (
+                  <div className="border-b-2 border-slate-900 pb-2 mb-4">
+                    <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-800">
+                      <RichTextRenderer text={content} />
+                    </h2>
+                  </div>
+                );
+              }
+              if (el.type === 'white_space') return <div className="h-8" />;
 
-        // Visual Polish: Normalize font sizes slightly to avoid "ransom note" effect if AI varies by 1px
-        const baseSize = el.style?.fontSize || 12;
-        const normalizedFontSize = Math.round(baseSize);
+              return (
+                <div className="flex gap-4 items-start group">
+                  {/* Question Number or Auto-Numbering for Problems */}
+                  {(el.type === 'problem' || el.type === 'word_problem' || el.type === 'question_number') && (
+                    <div className="text-sky-600 font-bold text-lg min-w-[2rem] pt-1">
+                      {el.type === 'question_number' ? content.replace('.', '') : (idx + 1)}.
+                    </div>
+                  )}
 
-        const fontSize = Math.max(normalizedFontSize, 11);
-        const fontWeight = el.style?.fontWeight || 'normal';
-        const textAlign = el.style?.alignment || 'left';
+                  <div className="flex-1 space-y-2">
+                    {/* Main Content */}
+                    <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'}`}>
+                      {el.type === 'problem' ? (
+                        <MathText tex={content} />
+                      ) : (
+                        <RichTextRenderer text={content} />
+                      )}
+                    </div>
 
-        // Sophisticated Color Palette
-        const isHeader = el.type === 'header' || el.type === 'section_header';
-        const color = isHeader ? 'text-slate-700' : 'text-slate-900';
+                    {/* Diagram Placeholders */}
+                    {el.type === 'diagram' && (
+                      <div className="border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 h-48 w-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">
+                        Diagram Placeholder
+                      </div>
+                    )}
 
-        const content = el.mirroredContent || el.content;
+                    {/* Answer Key (Hidden by default) */}
+                    {showAnswers && el.solution && (
+                      <div className="mt-2 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg inline-block">
+                        <div className="text-[10px] font-black uppercase text-emerald-600 tracking-wider mb-1">Solution</div>
+                        <div className="text-emerald-900 font-bold text-sm">
+                          <RichTextRenderer text={el.solution} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        ))
+      ) : (
+        // --- ABSOLUTE LAYOUT (Legacy / Generator) ---
+        elements.map((el, idx) => {
+          if (el.type === 'white_space') return null;
 
-        // Professional Font Stacks
-        const serifStack = "'EB Garamond', 'Times New Roman', serif";
-        const sansStack = "'Inter', system-ui, -apple-system, sans-serif";
-        const fontFamily = el.style?.fontFamily === 'serif' ? serifStack : sansStack;
+          const [ymin, xmin, ymax, xmax] = el.boundingBox;
+          // Convert 0-1000 scale to strict INTEGER pixels for 100% stable alignment
+          const x = Math.round(xmin * 0.794);
+          const y = Math.round(ymin * 1.123);
+          const w = Math.round((xmax - xmin) * 0.794);
+          const h = Math.round((ymax - ymin) * 1.123);
 
-        // Special styling for Question Numbers to make them pop
-        const isQuestionNumber = el.type === 'question_number';
-        const finalFontWeight = isQuestionNumber ? '700' : fontWeight;
-        const finalColor = isQuestionNumber ? 'text-sky-600' : color;
+          // Visual Polish: Normalize font sizes slightly to avoid "ransom note" effect if AI varies by 1px
+          const baseSize = el.style?.fontSize || 12;
+          const normalizedFontSize = Math.round(baseSize);
 
-        return (
-          <div
-            key={el.id || idx}
-            className={`absolute ${finalColor} overflow-visible transition-colors`}
-            style={{
-              left: `${x}px`,
-              top: `${y}px`,
-              width: el.type === 'header' ? 'auto' : `${w}px`,
-              minWidth: el.type === 'header' ? '120px' : 'auto',
-              height: `${h}px`,
-              fontSize: `${fontSize}px`,
-              fontWeight: finalFontWeight,
-              textAlign: textAlign,
-              fontFamily: isQuestionNumber ? sansStack : fontFamily, // Numbers look better in Sans
-              lineHeight: el.type === 'word_problem' ? '1.6' : '1.25',
-              display: 'flex', // Flexbox for better control than table
-              flexDirection: 'column',
-              justifyContent: el.type === 'problem' || el.type === 'header' ? 'center' : 'flex-start',
-              letterSpacing: (isHeader || isQuestionNumber) ? '-0.01em' : 'normal',
-            }}
-          >
+          const fontSize = Math.max(normalizedFontSize, 11);
+          const fontWeight = el.style?.fontWeight || 'normal';
+          const textAlign = el.style?.alignment || 'left';
+
+          // Sophisticated Color Palette
+          const isHeader = el.type === 'header' || el.type === 'section_header';
+          const color = isHeader ? 'text-slate-700' : 'text-slate-900';
+
+          const content = el.mirroredContent || el.content;
+
+          // Professional Font Stacks
+          const serifStack = "'EB Garamond', 'Times New Roman', serif";
+          const sansStack = "'Inter', system-ui, -apple-system, sans-serif";
+          const fontFamily = el.style?.fontFamily === 'serif' ? serifStack : sansStack;
+
+          // Special styling for Question Numbers to make them pop
+          const isQuestionNumber = el.type === 'question_number';
+          const finalFontWeight = isQuestionNumber ? '700' : fontWeight;
+          const finalColor = isQuestionNumber ? 'text-sky-600' : color;
+
+          return (
             <div
+              key={el.id || idx}
+              className={`absolute ${finalColor} overflow-visible transition-colors`}
               style={{
-                width: '100%',
-                // No inner flex needed usually, but keeps text flow standard
+                left: `${x}px`,
+                top: `${y}px`,
+                width: el.type === 'header' ? 'auto' : `${w}px`,
+                minWidth: el.type === 'header' ? '120px' : 'auto',
+                height: `${h}px`,
+                fontSize: `${fontSize}px`,
+                fontWeight: finalFontWeight,
+                textAlign: textAlign,
+                fontFamily: isQuestionNumber ? sansStack : fontFamily, // Numbers look better in Sans
+                lineHeight: el.type === 'word_problem' ? '1.6' : '1.25',
+                display: 'flex', // Flexbox for better control than table
+                flexDirection: 'column',
+                justifyContent: el.type === 'problem' || el.type === 'header' ? 'center' : 'flex-start',
+                letterSpacing: (isHeader || isQuestionNumber) ? '-0.01em' : 'normal',
               }}
             >
-              {el.type === 'problem' ? (
-                <div className="w-full inline-block" style={{ lineHeight: '1', overflow: 'visible' }}>
-                  {content ? (
-                    <MathText tex={content} />
-                  ) : (
-                    <div className="text-slate-300 italic text-[10px]">Empty problem</div>
-                  )}
-                </div>
-              ) : el.type === 'word_problem' ? (
-                <div className="w-full inline-block text-slate-800" style={{ whiteSpace: 'pre-wrap' }}>
-                  <RichTextRenderer text={content} />
-                </div>
-              ) : el.type === 'diagram' ? (
-                <div className="w-full h-full relative overflow-hidden rounded-md border border-slate-100">
-                  {originalImageUrl ? (
-                    // Clip the original image to this bounding box
-                    // The logic is: We display the Full Page image locally, but shift it so only the relevant part is visible
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <img
-                        src={originalImageUrl}
+              <div
+                style={{
+                  width: '100%',
+                  // No inner flex needed usually, but keeps text flow standard
+                }}
+              >
+                {el.type === 'problem' ? (
+                  <div className="w-full inline-block" style={{ lineHeight: '1', overflow: 'visible' }}>
+                    {content ? (
+                      <MathText tex={content} />
+                    ) : (
+                      <div className="text-slate-300 italic text-[10px]">Empty problem</div>
+                    )}
+                  </div>
+                ) : el.type === 'word_problem' ? (
+                  <div className="w-full inline-block text-slate-800" style={{ whiteSpace: 'pre-wrap' }}>
+                    <RichTextRenderer text={content} />
+                  </div>
+                ) : el.type === 'diagram' ? (
+                  <div className="w-full h-full relative overflow-hidden rounded-md border border-slate-100">
+                    {originalImageUrl ? (
+                      // Clip the original image to this bounding box
+                      // The logic is: We display the Full Page image locally, but shift it so only the relevant part is visible
+                      <div
                         style={{
                           position: 'absolute',
-                          // Negative offsets to shift the image
-                          top: `-${y}px`,
-                          left: `-${x}px`,
-                          // The image size must match the specific page dimensions we are rendering
-                          width: `${pageWidth}px`,
-                          height: `${pageHeight}px`,
-                          maxWidth: 'none'
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          overflow: 'hidden'
                         }}
-                        alt="Diagram from original"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-full h-full border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center p-2 bg-slate-50">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">{content || "Diagram Missing"}</span>
-                    </div>
-                  )}
-                </div>
-              ) : el.type === 'response_area' ? (
-                // Use a positioned scale to ensure line feels "grounded" but not too thick
-                <div className="w-full h-full flex items-end pb-1">
-                  <div className="w-full border-b-2 border-slate-200" />
-                </div>
-              ) : el.type === 'section_header' ? (
-                <div className="w-full inline-block font-black uppercase tracking-widest text-slate-800 border-b-2 border-slate-200 pb-1 mb-2">
-                  <RichTextRenderer text={content} />
-                </div>
-              ) : (
-                <div className="inline-block">
-                  <RichTextRenderer text={
-                    // Fallback for problems: if delimiters are missing, wrap them in inline math
-                    // Fallback for problems: if delimiters are missing, wrap them in inline math
-                    el.type === 'problem' && !content.includes('\\(') && !content.includes('\\[')
-                      // Heuristic: If it looks like math (has backslash commands or operators), wrap it
-                      && (content.includes('\\') || content.match(/[=<>+\-*/^]/))
-                      ? `\\( ${content} \\)`
-                      : (content || " ")
-                  } />
-                  {showAnswers && el.solution && (
-                    <div className="mt-2 p-2 bg-sky-50 dark:bg-sky-900/10 border-l-2 border-sky-500 text-sky-700 dark:text-sky-300 text-[10px] font-bold">
-                      <span className="uppercase text-[8px] block opacity-60 mb-1">Answer</span>
-                      <RichTextRenderer text={el.solution} />
-                    </div>
-                  )}
-                </div>
-              )}
+                      >
+                        <img
+                          src={originalImageUrl}
+                          style={{
+                            position: 'absolute',
+                            // Negative offsets to shift the image
+                            top: `-${y}px`,
+                            left: `-${x}px`,
+                            // The image size must match the specific page dimensions we are rendering
+                            width: `${pageWidth}px`,
+                            height: `${pageHeight}px`,
+                            maxWidth: 'none'
+                          }}
+                          alt="Diagram from original"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center p-2 bg-slate-50">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">{content || "Diagram Missing"}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : el.type === 'response_area' ? (
+                  // Use a positioned scale to ensure line feels "grounded" but not too thick
+                  <div className="w-full h-full flex items-end pb-1">
+                    <div className="w-full border-b-2 border-slate-200" />
+                  </div>
+                ) : el.type === 'section_header' ? (
+                  <div className="w-full inline-block font-black uppercase tracking-widest text-slate-800 border-b-2 border-slate-200 pb-1 mb-2">
+                    <RichTextRenderer text={content} />
+                  </div>
+                ) : (
+                  <div className="inline-block">
+                    <RichTextRenderer text={
+                      // Fallback for problems: if delimiters are missing, wrap them in inline math
+                      // Fallback for problems: if delimiters are missing, wrap them in inline math
+                      el.type === 'problem' && !content.includes('\\(') && !content.includes('\\[')
+                        // Heuristic: If it looks like math (has backslash commands or operators), wrap it
+                        && (content.includes('\\') || content.match(/[=<>+\-*/^]/))
+                        ? `\\( ${content} \\)`
+                        : (content || " ")
+                    } />
+                    {showAnswers && el.solution && (
+                      <div className="mt-2 p-2 bg-sky-50 dark:bg-sky-900/10 border-l-2 border-sky-500 text-sky-700 dark:text-sky-300 text-[10px] font-bold">
+                        <span className="uppercase text-[8px] block opacity-60 mb-1">Answer</span>
+                        <RichTextRenderer text={el.solution} />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        }))}
     </div>
   );
 });
@@ -1182,6 +1253,7 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
           elements={worksheet.elements || []}
           originalImageUrl={worksheet.originalImageUrl}
           showAnswers={showAnswers}
+          layoutMode={worksheet.type === 'Mirror' ? 'flow' : 'absolute'}
         />
       </div>
 
@@ -1262,6 +1334,7 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
               elements={worksheet.elements}
               originalImageUrl={worksheet.originalImageUrl}
               showAnswers={showAnswers}
+              layoutMode={worksheet.type === 'Mirror' ? 'flow' : 'absolute'}
             />
           </div>
         </div>
