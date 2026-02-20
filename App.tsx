@@ -154,7 +154,8 @@ const RichTextRenderer: React.FC<{ text: string; className?: string }> = ({ text
   if (!text) return null;
 
   // Split by LaTeX delimiters and underscore sequences (2 or more)
-  const parts = text.split(/(\\\(.*?\\\)|\\\[.*?\\\]|__+)/g);
+  // CRITICAL FIX: Use [\s\S] instead of . to match newlines in LaTeX blocks
+  const parts = text.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|__+)/g);
 
   return (
     <span className={className}>
@@ -892,7 +893,10 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                 <div className="inline-block">
                   <RichTextRenderer text={
                     // Fallback for problems: if delimiters are missing, wrap them in inline math
+                    // Fallback for problems: if delimiters are missing, wrap them in inline math
                     el.type === 'problem' && !content.includes('\\(') && !content.includes('\\[')
+                      // Heuristic: If it looks like math (has backslash commands or operators), wrap it
+                      && (content.includes('\\') || content.match(/[=<>+\-*/^]/))
                       ? `\\( ${content} \\)`
                       : (content || " ")
                   } />
