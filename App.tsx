@@ -2363,7 +2363,7 @@ const App: React.FC = () => {
 
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('mirror-math-theme');
+      const saved = localStorage.getItem('mirror-math-theme-v2');
       if (saved) return saved === 'dark';
       // Default to light mode (false) even if system prefers dark
       return false;
@@ -2376,10 +2376,10 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
-      localStorage.setItem('mirror-math-theme', 'dark');
+      localStorage.setItem('mirror-math-theme-v2', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('mirror-math-theme', 'light');
+      localStorage.setItem('mirror-math-theme-v2', 'light');
     }
   }, [isDark]);
 
