@@ -2364,7 +2364,8 @@ const App: React.FC = () => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('mirror-math-theme');
       if (saved) return saved === 'dark';
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      // Default to light mode (false) even if system prefers dark
+      return false;
     }
     return false;
   });
