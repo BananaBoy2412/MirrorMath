@@ -29,58 +29,39 @@ serve(async (req) => {
             const { image, mimeType } = payload;
 
             const prompt = `
-        Analyze this worksheet and perform a precise structural and spatial parsing. 
-        CRITICAL: I need to reconstruct this worksheet EXACTLY as it appears, but IGNORING any student work.
+        Analyze this worksheet image. 
+        GOAL: Extract the structure and content to create a mirrored version.
+        
+        CRITICAL INSTRUCTIONS:
+        1. **TRANSCRIBE ONLY**: Do NOT create new problems. Transcribe ONLY what is visible in the image.
+        2. **STOP CONDITION**: Stop outputting immediately after the last problem on the page. Do not invent extra problems.
+        3. **Math Formatting**: 
+           - For 'problem' type: Return **RAW LATEX** (e.g., "x^2 + 5" or "\frac{1}{2}"). Do **NOT** wrap in \( \).
+           - For 'word_problem' type: Wrap math in \( ... \) (mixed text).
+        4. **IGNORE HANDWRITING**: This is a blank worksheet reconstruction. Ignore ALL pencil marks, scribbles, and student answers. 
+        5. **Layout**: Preserve the exact spatial layout.
 
         Identified Elements:
-        1. **Header Labels**: (e.g., "Name:", "Date:", "Score:")
-        2. **Question Numbers**: (e.g., "1.", "2)") - Keep separate from problem text.
-        3. **Math Problems** (type: 'problem'):
-           - CRITICAL: Content MUST be wrapped in LaTeX delimiters: \\( ... \\) for inline, \\[ ... \\] for block.
-           - Example: "\\( x^2 + 5 = 10 \\)" (Note the double backslashes for JSON).
-           - Ignore student handwriting/answers. Only extract the printed equation.
-        4. **Word Problems** (type: 'word_problem'):
-           - Use for mixed text/math.
-           - Wrap ALL math expressions in \\( ... \\).
-        5. **Instructions** (type: 'instruction'): Section headers or directions.
-        6. **Response Areas** (type: 'response_area'): Underscores '______' or empty boxes.
-
-        LAYOUT RULES:
-        - **Bounding Boxes**: [ymin, xmin, ymax, xmax] (0-1000). 
-        - **Ignore Handwriting**: Do NOT transcribe pencil marks, scribbles, or handwritten answers. If a problem has an answer written next to it, ignore the answer.
-        - **Ignore Distractions**: Ignore logos, page borders, and copyright text.
-        - **Title Extraction**: Look for the main title at the top (e.g., "Algebra 1 Review"). If missing, generate a short, descriptive title based on the equations (e.g., "Quadratic Equations").
-
-        OUTPUT FORMAT (BLOCKS):
-        Do NOT return JSON. Return a RAW TEXT list of elements using these exact delimiters.
-
+        1. **Header Labels**: (Name, Date, Score) -> Type: 'header'
+        2. **Math Problems**: Type: 'problem'. Content is RAW LaTeX.
+        3. **Word Problems**: Type: 'word_problem'. Content is text with \( math \).
+        4. **Instructions**: Type: 'instruction'.
+        
+        LAYOUT & BOUNDING BOXES:
+        - Provide [ymin, xmin, ymax, xmax] (0-1000) for every element.
+        
+        OUTPUT FORMAT (Strict):
         ---TITLE---
-        [The Worksheet Title]
+        [Worksheet Title]
         ---ELEMENT---
-        Type: problem
-        Box: [100, 50, 200, 450]
-        Content: \( x^2 + 5 = 10 \)
-        Mirrored: \( y^2 - 3 = 13 \)
-        Solution: \( y = \pm 4 \)
+        Type: header | problem | instruction | word_problem | section_header
+        Box: [y1, x1, y2, x2]
+        Content: [Raw LaTeX for problems, Mixed Text for others]
+        Mirrored: [Logically equivalent variant]
+        Solution: [Answer to Mirrored]
         ---ELEMENT---
-        Type: header
-        Box: [10, 10, 50, 300]
-        Content: Name: ________________
-        Mirrored: Name: ________________
-        Solution: N/A
-        ---ELEMENT---
-        Type: instruction
-        Box: [300, 50, 350, 950]
-        Content: Solve for x.
-        Mirrored: Solve for variables.
-        Solution: N/A
         ...
-
-        RULES for CONTENT:
-        1. **NO JSON ESCAPING**: Write LaTeX exactly as is. e.g. use \frac, not \\frac.
-        2. **Math Delimiters**: ALWAYS wrap math in \( ... \) for inline or \[ ... \] for block.
-        3. **Solutions**: You MUST provide a solution for the *Mirrored* problem.
-        4. **Type**: Must be one of: header, problem, question_number, white_space, instruction, word_problem, diagram, section_header, response_area.
+        (Stop after last element)
       `;
 
 

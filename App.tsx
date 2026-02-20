@@ -781,65 +781,84 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
     >
       {layoutMode === 'flow' ? (
         // --- FLOW LAYOUT (Professional List) ---
-        sortedElements.map((el, idx) => (
-
-          <div key={el.id || idx} className="w-full relative">
-            {/* Standard Element Rendering for Flow */}
-            {(() => {
-              const content = el.mirroredContent || el.content;
-
-              if (el.type === 'header' || el.type === 'section_header') {
-                return (
-                  <div className="border-b-2 border-slate-900 pb-2 mb-4">
-                    <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-800">
-                      <RichTextRenderer text={content} />
-                    </h2>
-                  </div>
-                );
-              }
-              if (el.type === 'white_space') return <div className="h-8" />;
-
-              return (
-                <div className="flex gap-4 items-start group">
-                  {/* Question Number or Auto-Numbering for Problems */}
-                  {(el.type === 'problem' || el.type === 'word_problem' || el.type === 'question_number') && (
-                    <div className="text-sky-600 font-bold text-lg min-w-[2rem] pt-1">
-                      {el.type === 'question_number' ? content.replace('.', '') : (idx + 1)}.
-                    </div>
-                  )}
-
-                  <div className="flex-1 space-y-2">
-                    {/* Main Content */}
-                    <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'}`}>
-                      {el.type === 'problem' ? (
-                        <MathText tex={content} />
-                      ) : (
-                        <RichTextRenderer text={content} />
-                      )}
-                    </div>
-
-                    {/* Diagram Placeholders */}
-                    {el.type === 'diagram' && (
-                      <div className="border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 h-48 w-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">
-                        Diagram Placeholder
-                      </div>
-                    )}
-
-                    {/* Answer Key (Hidden by default) */}
-                    {showAnswers && el.solution && (
-                      <div className="mt-2 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg inline-block">
-                        <div className="text-[10px] font-black uppercase text-emerald-600 tracking-wider mb-1">Solution</div>
-                        <div className="text-emerald-900 font-bold text-sm">
-                          <RichTextRenderer text={el.solution} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+        <div className="flex flex-col gap-6 w-full h-full">
+          {/* 1. STANDARD HEADER (Enforced) */}
+          <div className="w-full flex flex-col gap-4 border-b-2 border-slate-900 pb-6 mb-4">
+            <div className="flex justify-between items-end">
+              <div className="flex-1">
+                <span className="text-xl font-bold text-slate-900 uppercase tracking-widest mr-2">NAME:</span>
+                <div className="inline-block border-b-2 border-slate-300 w-64"></div>
+              </div>
+              <div className="flex-1 text-right">
+                <span className="text-xl font-bold text-slate-900 uppercase tracking-widest mr-2">DATE:</span>
+                <div className="inline-block border-b-2 border-slate-300 w-48"></div>
+              </div>
+            </div>
+            {/* Title Extraction from existing elements if available, else default */}
+            <div className="text-center">
+              <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">
+                {elements.find(e => e.type === 'section_header' || e.type === 'header')?.content?.replace('Name:', '') || "Worksheet"}
+              </h1>
+            </div>
           </div>
-        ))
+
+          {/* 2. PROBLEMS LIST */}
+          {sortedElements
+            .filter(el => el.type !== 'header' && el.type !== 'section_header') // Filter out detected headers to avoid dupes
+            .map((el, idx) => (
+
+              <div key={el.id || idx} className="w-full relative">
+                {/* Standard Element Rendering for Flow */}
+                {(() => {
+                  const content = el.mirroredContent || el.content;
+
+                  if (el.type === 'white_space') return <div className="h-4" />; // Reduce whitespace
+
+                  return (
+                    <div className="flex gap-4 items-start group">
+                      {/* Question Number or Auto-Numbering for Problems */}
+                      {(el.type === 'problem' || el.type === 'word_problem' || el.type === 'question_number') && (
+                        <div className="text-sky-600 font-bold text-xl min-w-[2.5rem] pt-1">
+                          {el.type === 'question_number' ? content.replace('.', '') : (idx + 1)}.
+                        </div>
+                      )}
+
+                      <div className="flex-1 space-y-2">
+                        {/* Main Content */}
+                        <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'}`}>
+                          {el.type === 'problem' ? (
+                            // CRITICAL: Check for math delimiters. If missing, wrap it.
+                            // But if MathText handles it, we can just pass content.
+                            // Let's safe-wrap just in case the AI missed it.
+                            <MathText tex={content.startsWith('\\') || content.includes('=') ? content : `\\( ${content} \\)`} />
+                          ) : (
+                            <RichTextRenderer text={content} />
+                          )}
+                        </div>
+
+                        {/* Diagram Placeholders */}
+                        {el.type === 'diagram' && (
+                          <div className="border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 h-48 w-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">
+                            Diagram Placeholder
+                          </div>
+                        )}
+
+                        {/* Answer Key (Hidden by default) */}
+                        {showAnswers && el.solution && (
+                          <div className="mt-2 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg inline-block">
+                            <div className="text-[10px] font-black uppercase text-emerald-600 tracking-wider mb-1">Solution</div>
+                            <div className="text-emerald-900 font-bold text-sm">
+                              <RichTextRenderer text={el.solution} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            ))}
+        </div>
       ) : (
         // --- ABSOLUTE LAYOUT (Legacy / Generator) ---
         elements.map((el, idx) => {
