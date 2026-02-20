@@ -30,37 +30,31 @@ serve(async (req) => {
 
             const prompt = `
         Analyze this worksheet and perform a precise structural and spatial parsing. 
-        CRITICAL: I need to reconstruct this worksheet EXACTLY as it appears. 
+        CRITICAL: I need to reconstruct this worksheet EXACTLY as it appears, but IGNORING any student work.
 
-        Identify every element on the page including:
-        - Header Labels (e.g., "Name:", "Date:", "Score:")
-        - Question numbers (e.g., "1.", "2)")
-        - Pure Math Problems (type: 'problem'). content MUST be a standalone equation (e.g. "x^2 + 5 = 10"). Do NOT put instructions or sentences here.
-        - Word Problems / Mixed Content (type: 'word_problem'). Use this for ANY content that contains words, sentences, or instructions.
-             CRITICAL: If the text contains math, wrap the math parts in LaTeX delimiters.
-             Use \\( ... \\) for inline math and \\\[ ... \\\] for block math.
-             Example: "Solve for \\(x\\) in the equation \\(y = mx + b\\)." NOT "$x$" or "x"
-        - Currency/Money: Use a plain $ sign (e.g., "$10.00"). DO NOT escape it with a backslash (no "\$").
-        - Diagrams or Graphs (CRITICAL: Only identify charts, graphs, or geometric figures ESSENTIAL to solving a problem. Do NOT include logos, clipart, or page borders).
-        - Section Headers (e.g., "Part A", "Geometry")
-        - Response Areas (CRITICAL: Identify ALL underlines '_______', empty boxes, or writing spaces intended for student answers. Extract as type 'response_area').
-        - Footer or instructions (type: 'instruction'). Treat same as 'word_problem' for mixed math/text.
+        Identified Elements:
+        1. **Header Labels**: (e.g., "Name:", "Date:", "Score:")
+        2. **Question Numbers**: (e.g., "1.", "2)") - Keep separate from problem text.
+        3. **Math Problems** (type: 'problem'):
+           - CRITICAL: Content MUST be wrapped in LaTeX delimiters: \\( ... \\) for inline, \\[ ... \\] for block.
+           - Example: "\\( x^2 + 5 = 10 \\)" (Note the double backslashes for JSON).
+           - Ignore student handwriting/answers. Only extract the printed equation.
+        4. **Word Problems** (type: 'word_problem'):
+           - Use for mixed text/math.
+           - Wrap ALL math expressions in \\( ... \\).
+        5. **Instructions** (type: 'instruction'): Section headers or directions.
+        6. **Response Areas** (type: 'response_area'): Underscores '______' or empty boxes.
 
         LAYOUT RULES:
-        1. Bounding Boxes: Provide generous [ymin, xmin, ymax, xmax] boxes (normalized 0-1000). 
-           - CRITICAL: Math problems and Word Problems NEED vertical breathing room. Give them 30% MORE vertical height (ymin, ymax).
-           - CRITICAL: Question Numbers (e.g. "1.") MUST be kept separate from the Problem Text. Ensure their boxes do NOT overlap.
-           - IGNORE logos, school branding, or decorative images at the top/corners of the page.
-           - IGNORE copyright symbols (©), publisher names, website URLs, and page numbers at the bottom.
-           - Ensure the width (xmax-xmin) is wide enough to contain full content without clipping.
-           - If a problem has multiple lines, group them or ensure boxes are vertically aligned.
-        2. Visual Hierarchy: Detect font size (in pts), font weight (bold/normal), horizontal alignment (left/center/right), and font family (serif/sans-serif).
-        3. Mirroring:
-           - For every problem (math or word), generate a "Mirrored" version using different numbers/variables/scenarios but maintaining the same logic and difficulty.
-           - Return the mirrored problem in LaTeX for equations, or text for word problems.
-           - For diagrams, if possible, describe a mirrored version or keep the original description.
-           - For Response Areas, keep them as is (e.g. "__________" or "[Box]").
-           - Keep labels like "Name:" or "Date:" as they are.
+        - **Bounding Boxes**: [ymin, xmin, ymax, xmax] (0-1000). 
+        - **Ignore Handwriting**: Do NOT transcribe pencil marks, scribbles, or handwritten answers. If a problem has an answer written next to it, ignore the answer.
+        - **Ignore Distractions**: Ignore logos, page borders, and copyright text.
+
+        JSON FORMATTING RULES (CRITICAL):
+        - You are outputting a RAW JSON string.
+        - **ESCAPE ALL BACKSLASHES**: LaTeX macros like \\frac must be written as "\\\\frac" in the JSON string so they parse correctly.
+        - **ESCAPE QUOTES**: Internal quotes must be escaped (\\").
+        - **NO TRAILING COMMAS**.
 
         GENERATE JSON:
         Return strict JSON in this format:
@@ -70,15 +64,10 @@ serve(async (req) => {
             {
               "id": "unique_id",
               "type": "header" | "problem" | "question_number" | "white_space" | "instruction" | "word_problem" | "diagram" | "section_header" | "response_area",
-              "content": "Original text or LaTeX",
-              "mirroredContent": "New problem LaTeX/text or original label",
+              "content": "Original text (e.g. \"\\\\( 2x + 1 = 5 \\\\)\")",
+              "mirroredContent": "Mirrored version (e.g. \"\\\\( 3y - 2 = 7 \\\\)\")",
               "boundingBox": [ymin, xmin, ymax, xmax],
-              "style": {
-                "fontSize": number,
-                "fontWeight": "normal" | "bold",
-                "alignment": "left" | "center" | "right",
-                "fontFamily": "serif" | "sans-serif"
-              }
+              "style": { "fontSize": number, "fontWeight": "bold"|"normal", "alignment": "left"|"center"|"right" }
             }
           ]
         }
