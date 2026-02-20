@@ -2188,24 +2188,24 @@ const SettingsWorkspace: React.FC<{ isDark: boolean; setIsDark: (v: boolean) => 
   const { signOut, userPlan, user } = useAuth();
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12">
+    <div className="w-full max-w-4xl mx-auto space-y-8 md:space-y-12">
       <div className="space-y-2">
-        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Settings</h1>
-        <p className="text-slate-500 dark:text-slate-400 font-medium">Manage your workspace preferences.</p>
+        <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Settings</h1>
+        <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 font-medium">Manage your workspace preferences.</p>
       </div>
 
-      <div className="grid gap-8">
+      <div className="grid gap-6 md:gap-8">
         {/* User Profile Card */}
-        <div className="glass-card p-8 rounded-[40px] border border-sky-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 bg-sky-500 rounded-full flex items-center justify-center text-white text-2xl font-black uppercase">
+        <div className="glass-card p-6 md:p-8 rounded-3xl md:rounded-[40px] border border-sky-100 dark:border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 md:gap-6">
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-sky-500 rounded-full flex items-center justify-center text-white text-lg md:text-2xl font-black uppercase">
               {user?.email?.[0] || "U"}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white">{user?.email}</h3>
+              <h3 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white break-all">{user?.email}</h3>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Current Plan:</span>
-                <span className={`text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded ${userPlan === 'pro' ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-slate-400">Current Plan:</span>
+                <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded ${userPlan === 'pro' ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
                   {userPlan}
                 </span>
               </div>
@@ -2213,46 +2213,46 @@ const SettingsWorkspace: React.FC<{ isDark: boolean; setIsDark: (v: boolean) => 
           </div>
           <button
             onClick={signOut}
-            className="px-6 py-3 bg-red-50 dark:bg-red-900/10 text-red-500 font-bold rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center gap-2"
+            className="w-full md:w-auto px-6 py-3 bg-red-50 dark:bg-red-900/10 text-red-500 font-bold rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2"
           >
             <Trash2 size={18} /> Sign Out
           </button>
         </div>
 
-        <div className="glass-card p-10 rounded-[40px] border border-sky-100 dark:border-slate-800 space-y-10">
+        <div className="glass-card p-6 md:p-10 rounded-3xl md:rounded-[40px] border border-sky-100 dark:border-slate-800 space-y-8 md:space-y-10">
           <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+            <div className="space-y-1 md:space-y-2 pr-4">
+              <h3 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400">
                   {isDark ? <Moon size={20} /> : <Sun size={20} />}
                 </div>
                 Appearance
               </h3>
-              <p className="text-slate-500 dark:text-slate-400 font-medium">Switch between light and dark themes for the dashboard.</p>
+              <p className="text-xs md:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed">Switch between light and dark themes.</p>
             </div>
             <button
               onClick={() => setIsDark(!isDark)}
-              className={`w-16 h-9 rounded-full relative transition-colors duration-300 ${isDark ? 'bg-sky-500' : 'bg-slate-200'}`}
+              className={`shrink-0 w-14 h-8 md:w-16 md:h-9 rounded-full relative transition-colors duration-300 ${isDark ? 'bg-sky-500' : 'bg-slate-200'}`}
             >
               <motion.div
-                animate={{ x: isDark ? 30 : 4 }}
-                className="absolute top-1 w-7 h-7 bg-white rounded-full shadow-lg"
+                animate={{ x: isDark ? (window.innerWidth < 768 ? 24 : 30) : 4 }}
+                className="absolute top-1 w-6 h-6 md:w-7 md:h-7 bg-white rounded-full shadow-lg"
               />
             </button>
           </div>
 
-          <div className="pt-10 border-t border-slate-100 dark:border-slate-800">
+          <div className="pt-8 md:pt-10 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between opacity-50">
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+              <div className="space-y-1 md:space-y-2 pr-4">
+                <h3 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900/50 text-slate-400">
                     <Shield size={20} />
                   </div>
-                  Security & Privacy
+                  Security
                 </h3>
-                <p className="text-slate-500 dark:text-slate-400 font-medium">Manage your data and encryption settings.</p>
+                <p className="text-xs md:text-base text-slate-500 dark:text-slate-400 font-medium leading-relaxed">Manage your data and encryption settings.</p>
               </div>
-              <div className="text-slate-400 font-bold text-sm uppercase tracking-widest bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-md">Pro</div>
+              <div className="text-slate-400 font-bold text-[10px] md:text-sm uppercase tracking-widest bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-md">Pro</div>
             </div>
           </div>
         </div>
