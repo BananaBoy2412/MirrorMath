@@ -750,7 +750,7 @@ const ArchiveWorkspace: React.FC<{
 
 
 // --- Worksheet Preview Component ---
-const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[]; originalImageUrl?: string; showAnswers?: boolean; layoutMode?: 'absolute' | 'flow' }>(({ elements, originalImageUrl, showAnswers, layoutMode = 'absolute' }, ref) => {
+const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[]; originalImageUrl?: string; showAnswers?: boolean; layoutMode?: 'absolute' | 'flow'; title?: string }>(({ elements, originalImageUrl, showAnswers, layoutMode = 'absolute', title }, ref) => {
   const pageWidth = 794; // A4 width at 96 DPI
   const pageHeight = 1123; // A4 height at 96 DPI
 
@@ -794,10 +794,10 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                 <div className="inline-block border-b-2 border-slate-300 w-48"></div>
               </div>
             </div>
-            {/* Title Extraction from existing elements if available, else default */}
+            {/* Title from Prop (Database/AI) or extraction fallback */}
             <div className="text-center">
               <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">
-                {elements.find(e => e.type === 'section_header' || e.type === 'header')?.content?.replace('Name:', '') || "Worksheet"}
+                {title || elements.find(e => e.type === 'section_header' || e.type === 'header')?.content?.replace('Name:', '') || "Worksheet"}
               </h1>
             </div>
           </div>
@@ -1273,6 +1273,7 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
           originalImageUrl={worksheet.originalImageUrl}
           showAnswers={showAnswers}
           layoutMode={worksheet.type === 'Mirror' ? 'flow' : 'absolute'}
+          title={worksheet.title}
         />
       </div>
 
@@ -1348,12 +1349,14 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
 
       {viewMode === 'preview' && worksheet.elements ? (
         <div className="flex justify-center p-4 md:p-12 bg-slate-100/50 dark:bg-slate-900/30 rounded-[32px] md:rounded-[48px] border border-slate-200 dark:border-slate-800 overflow-hidden min-h-[500px] md:min-h-[900px]">
-          <div className="origin-top shadow-2xl border border-slate-200 transition-transform" style={{ transform: isMobile ? `scale(${window.innerWidth / 850})` : 'scale(0.75)' }}>
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute inset-0 flex items-center justify-center bg-black/5 z-10 pointer-events-none" />
+          <div className="transform scale-[0.25] origin-top-left w-[794px] h-[1123px] pointer-events-none bg-white">
+            {/* Thumbnail Preview */}
             <WorksheetPreview
-              elements={worksheet.elements}
+              elements={worksheet.elements || []}
               originalImageUrl={worksheet.originalImageUrl}
-              showAnswers={showAnswers}
               layoutMode={worksheet.type === 'Mirror' ? 'flow' : 'absolute'}
+              title={worksheet.title} // PASS TITLE HERE
             />
           </div>
         </div>

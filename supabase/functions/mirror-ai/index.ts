@@ -33,22 +33,23 @@ serve(async (req) => {
         GOAL: Extract the structure and content to create a mirrored version.
         
         CRITICAL INSTRUCTIONS:
-        1. **TRANSCRIBE ONLY**: Do NOT create new problems. Transcribe ONLY what is visible in the image.
-        2. **STOP CONDITION**: Stop outputting immediately after the last problem on the page. Do not invent extra problems.
-        3. **Math Formatting**: 
-           - For 'problem' type: Return **RAW LATEX** (e.g., "x^2 + 5" or "\frac{1}{2}"). Do **NOT** wrap in \( \).
-           - For 'word_problem' type: Wrap math in \( ... \) (mixed text).
-        4. **IGNORE HANDWRITING**: This is a blank worksheet reconstruction. Ignore ALL pencil marks, scribbles, and student answers. 
-        5. **Layout**: Preserve the exact spatial layout.
+        1. **STRUCTURE**: Transcribe the EXACT structure of the worksheet (same number of problems, same layout).
+        2. **CONTENT (Original)**: In the 'Content' field, transcribe the problem EXACTLY as seen in the image (Raw LaTeX).
+        3. **MIRRORED (New)**: In the 'Mirrored' field, you MUST generate a **NEW, DISTINCT** problem that tests the SAME skill but with DIFFERENT numbers/variables.
+           - **DO NOT COPY** the original problem to the 'Mirrored' field.
+           - The 'Mirrored' problem must be solvably equivalent (same difficulty).
+        4. **STOP CONDITION**: Stop outputting after the last problem.
+        5. **IGNORE HANDWRITING**: Ignore student answers/scribbles.
 
         Identified Elements:
         1. **Header Labels**: (Name, Date, Score) -> Type: 'header'
-        2. **Math Problems**: Type: 'problem'. Content is RAW LaTeX.
-        3. **Word Problems**: Type: 'word_problem'. Content is text with \( math \).
+        2. **Math Problems**: Type: 'problem'. Content = Raw LaTeX. Mirrored = NEW Raw LaTeX.
+        3. **Word Problems**: Type: 'word_problem'.
         4. **Instructions**: Type: 'instruction'.
         
-        LAYOUT & BOUNDING BOXES:
-        - Provide [ymin, xmin, ymax, xmax] (0-1000) for every element.
+        NEGATIVE CONSTRAINTS:
+        - Do NOT copy the original problem into the 'Mirrored' field. They must be different.
+        - Do NOT transcribe ghost marks/scribbles.
         
         OUTPUT FORMAT (Strict):
         ---TITLE---
@@ -56,9 +57,9 @@ serve(async (req) => {
         ---ELEMENT---
         Type: header | problem | instruction | word_problem | section_header
         Box: [y1, x1, y2, x2]
-        Content: [Raw LaTeX for problems, Mixed Text for others]
-        Mirrored: [Logically equivalent variant]
-        Solution: [Answer to Mirrored]
+        Content: [Original Problem Raw LaTeX]
+        Mirrored: [NEW UNIQUE VARIANT Raw LaTeX]
+        Solution: [Answer to MIRRORED problem]
         ---ELEMENT---
         ...
         (Stop after last element)
