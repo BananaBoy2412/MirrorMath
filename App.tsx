@@ -58,6 +58,7 @@ interface LayoutElement {
   mirroredContent?: string;
   solution?: string;
   skill?: string;
+  svgContent?: string;
   boundingBox: [number, number, number, number]; // [ymin, xmin, ymax, xmax] (normalized 0-1000)
   style?: {
     fontSize: number;
@@ -103,30 +104,25 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
   useEffect(() => {
     if (containerRef.current) {
       try {
-        // Use \displaystyle for block math, \textstyle for inline text flow
-        // The previous forced \displaystyle broke inline text spacing
         let styledTex = tex;
         if (!inline) {
           styledTex = tex.startsWith('\\displaystyle') ? tex : `\\displaystyle{ ${tex} }`;
         } else {
-          // For inline, we trust the caller or default to standard sizing
           styledTex = tex.startsWith('\\textstyle') ? tex : `\\textstyle{ ${tex} }`;
         }
 
         katex.render(styledTex, containerRef.current, {
-          throwOnError: true, // Throw so we can catch and fallback
+          throwOnError: true,
           displayMode: false,
           trust: true,
           strict: false
         });
       } catch (err) {
-        // Fallback: Just show the raw text if KaTeX fails
-        // This prevents "Red Text" error messages from ruining the worksheet
         console.warn("KaTeX render failed, falling back to text:", tex);
         if (containerRef.current) {
           containerRef.current.textContent = tex;
-          containerRef.current.style.fontFamily = 'sans-serif'; // Revert to readable font
-          containerRef.current.style.fontStyle = 'normal';
+          containerRef.current.style.fontFamily = "'EB Garamond', serif";
+          containerRef.current.style.fontStyle = 'italic';
         }
       }
     }
@@ -137,11 +133,12 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
       ref={containerRef}
       className={`katex-math-block ${inline ? 'inline' : 'inline-block align-middle'} ${className}`}
       style={{
-        lineHeight: 'normal', // CRITICAL FIX: 'inherit' causes SVG vector lines (fractions) to drift upwards. 'normal' resets it.
-        fontSize: '1em',      // Ensure it matches native text size
+        lineHeight: '1.2',
+        fontSize: '1.05em',
         color: 'inherit',
         fontFamily: 'KaTeX_Main, "Times New Roman", serif',
-        fontVariantNumeric: 'tabular-nums'
+        fontVariantNumeric: 'tabular-nums',
+        letterSpacing: '0.01em'
       }}
     />
   );
@@ -827,19 +824,25 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                         {/* Main Content */}
                         <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'}`}>
                           {el.type === 'problem' ? (
-                            // CRITICAL: Check for math delimiters. If missing, wrap it.
-                            // But if MathText handles it, we can just pass content.
-                            // Let's safe-wrap just in case the AI missed it.
-                            <MathText tex={content.startsWith('\\') || content.includes('=') ? content : `\\( ${content} \\)`} />
+                            <MathText tex={content.startsWith('\\') || content.includes('=') || content.includes('^') ? content : `\\( ${content} \\)`} />
                           ) : (
                             <RichTextRenderer text={content} />
                           )}
                         </div>
 
-                        {/* Diagram Placeholders */}
+                        {/* SVG or Diagram Rendering */}
                         {el.type === 'diagram' && (
-                          <div className="border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 h-48 w-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">
-                            Diagram Placeholder
+                          <div className="w-full py-4 flex justify-center">
+                            {el.svgContent ? (
+                              <div
+                                className="max-w-md w-full bg-white p-4 rounded-lg border border-slate-100 shadow-sm"
+                                dangerouslySetInnerHTML={{ __html: el.svgContent }}
+                              />
+                            ) : (
+                              <div className="border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 h-48 w-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">
+                                Diagram Placeholder
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -935,28 +938,23 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                     <RichTextRenderer text={content} />
                   </div>
                 ) : el.type === 'diagram' ? (
-                  <div className="w-full h-full relative overflow-hidden rounded-md border border-slate-100">
-                    {originalImageUrl ? (
-                      // Clip the original image to this bounding box
-                      // The logic is: We display the Full Page image locally, but shift it so only the relevant part is visible
+                  <div className="w-full h-full relative overflow-visible">
+                    {el.svgContent ? (
                       <div
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          overflow: 'hidden'
-                        }}
+                        className="w-full h-full flex items-center justify-center"
+                        dangerouslySetInnerHTML={{ __html: el.svgContent }}
+                      />
+                    ) : originalImageUrl ? (
+                      // Clip the original image to this bounding box
+                      <div
+                        className="w-full h-full relative overflow-hidden rounded-md border border-slate-100"
                       >
                         <img
                           src={originalImageUrl}
                           style={{
                             position: 'absolute',
-                            // Negative offsets to shift the image
                             top: `-${y}px`,
                             left: `-${x}px`,
-                            // The image size must match the specific page dimensions we are rendering
                             width: `${pageWidth}px`,
                             height: `${pageHeight}px`,
                             maxWidth: 'none'
@@ -1570,7 +1568,7 @@ const MirrorWorkspace: React.FC<{
       const elementBlocks = rawText.split('---ELEMENT---').slice(1);
       const elements: any[] = elementBlocks.map((block: string, index: number) => {
         const getField = (name: string) => {
-          const match = block.match(new RegExp(`${name}:\\s*([\\s\\S]*?)(?=\\n?(?:Type|Box|Content|Mirrored|Solution):|$)`, 'i'));
+          const match = block.match(new RegExp(`${name}:\\s*([\\s\\S]*?)(?=\\n?(?:Type|Box|Content|Mirrored|Solution|SVG):|$)`, 'i'));
           return match ? match[1].trim() : '';
         };
 
@@ -1579,26 +1577,29 @@ const MirrorWorkspace: React.FC<{
         const content = getField('Content');
         const mirrored = getField('Mirrored');
         const solution = getField('Solution');
+        const skill = getField('Skill') || 'Math Reflection';
+        const svgContent = getField('SVG');
 
-        let boundingBox = [0, 0, 0, 0];
-        try {
-          if (boxStr) boundingBox = JSON.parse(boxStr);
-        } catch (e) {
-          console.warn("Failed to parse box:", boxStr);
+        let boundingBox: [number, number, number, number] = [0, 0, 0, 0];
+        if (boxStr) {
+          const nums = boxStr.replace(/[\[\]]/g, '').split(',').map(n => parseInt(n.trim()));
+          if (nums.length === 4) boundingBox = nums as [number, number, number, number];
         }
 
         return {
           id: `el_${Date.now()}_${index}`,
-          type: type.toLowerCase(),
+          type: type.toLowerCase() as LayoutElement['type'],
           content: content,
           mirroredContent: mirrored || content,
           solution: solution !== 'N/A' ? solution : '',
+          skill: skill,
+          svgContent: svgContent !== 'N/A' ? svgContent : undefined,
           boundingBox: boundingBox,
           style: {
             fontSize: type === 'header' ? 12 : 14,
             fontWeight: type === 'header' ? 'bold' : 'normal',
-            alignment: 'left',
-            fontFamily: 'sans-serif'
+            alignment: 'left' as const,
+            fontFamily: 'sans-serif' as const
           }
         };
       });
@@ -1630,7 +1631,7 @@ const MirrorWorkspace: React.FC<{
               original: el.content,
               mirrored: el.mirroredContent || el.content,
               solution: el.solution || '',
-              skill: el.skill || 'Math Reflection'
+              skill: el.skill
             })),
           solution: "Generated by Layout-Aware Mirroring System"
         }
@@ -1926,24 +1927,28 @@ const GeneratorWorkspace: React.FC<{ onCreate: (worksheet: Worksheet) => Promise
       const responseData = await response.json();
       const text = responseData.data;
 
-      // PARSE BLOCK FORMAT
       // 1. Extract Title
-      const titleMatch = text.match(/---TITLE---\s*\n?(.*?)\n?---PROBLEM---/s);
+      const titleMatch = text.match(/---TITLE---\s*\n?([\s\S]*?)(?=\n?---PROBLEM---|$)/);
       const title = titleMatch ? titleMatch[1].trim() : "Generated Worksheet";
 
       // 2. Extract Problems
-      const problemBlocks = text.split('---PROBLEM---').slice(1); // Skip everything before first delimiter
+      const problemBlocks = text.split('---PROBLEM---').slice(1);
       const parsedProblems = problemBlocks.map(block => {
-        const typeMatch = block.match(/Type:\s*(problem|word_problem)/i);
-        const contentMatch = block.match(/Content:\s*([\s\S]*?)(?=Solution:|$|---PROBLEM---)/i);
-        const solutionMatch = block.match(/Solution:\s*([\s\S]*?)(?=$|---PROBLEM---)/i);
+        const getField = (name: string) => {
+          const match = block.match(new RegExp(`${name}:\\s*([\\s\\S]*?)(?=\\n?(?:Type|Box|Content|Mirrored|Solution):|$)`, 'i'));
+          return match ? match[1].trim() : '';
+        };
 
-        if (!contentMatch) return null;
+        const type = getField('Type') || 'problem';
+        const content = getField('Content');
+        const solution = getField('Solution');
+
+        if (!content) return null;
 
         return {
-          type: typeMatch ? typeMatch[1].toLowerCase() as 'problem' | 'word_problem' : 'problem',
-          content: contentMatch[1].trim(),
-          solution: solutionMatch ? solutionMatch[1].trim() : ""
+          type: type.toLowerCase() as 'problem' | 'word_problem',
+          content: content,
+          solution: solution
         };
       }).filter(p => p !== null).slice(0, questionCount) as { type: 'problem' | 'word_problem', content: string, solution: string }[];
 
