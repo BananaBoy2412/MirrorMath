@@ -111,9 +111,10 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
         // Robustness: Pre-process common Unicode symbols AI might return into LaTeX
         // This is a safety layer for "Identify-First" logic
         // Robustness: Translate tabular (not supported by KaTeX) to array (supported)
+        // Robustness: Translate tabular (not supported by KaTeX) to array (supported)
         math = math
-          .replace(/\\begin\{tabular\}/g, '\\begin{array}')
-          .replace(/\\end\{tabular\}/g, '\\end{array}');
+          .replace(/\\begin\{tabular\}/gi, '\\\\begin{array}')
+          .replace(/\\end\{tabular\}/gi, '\\\\end{array}');
 
         math = math
           .replace(/∑/g, '\\sum ')
@@ -206,12 +207,13 @@ const SmartMathRenderer: React.FC<{ text: string; className?: string; safe?: boo
   if (!text) return null;
 
   // 1. TOKENIZATION ENGINE
-  // Safe mode only identifies explicit delimiters, environments (with args), and underscores
-  const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}(?:\{[^{}]*\}|\[[^[\]]*\])*[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+)/g;
+  // Safe mode only identifies explicit delimiters, environments, and underscores
+  // Simplified environment regex to be more robust against nested specifiers
+  const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+)/g;
 
   // Professional-grade regex for mixed academic content identification (Identify-First)
-  // Refined to support LaTeX environments with arguments and group commands with their suffixes
-  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}(?:\{[^{}]*\}|\[[^[\]]*\])*[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{[^{}]*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{[^{}]*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
+  // Refined to support LaTeX environments and group commands with their suffixes
+  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{[^{}]*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{[^{}]*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
 
   const tokenRegex = safe ? delimitedRegex : professionalRegex;
   const parts = text.split(tokenRegex);
@@ -889,12 +891,13 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
             const flowElements = sortedElements.filter(el => el.type !== 'header' && el.type !== 'section_header');
             const problemElements = flowElements.filter(el => el.type === 'problem' || el.type === 'word_problem');
             const hasManyProblems = problemElements.length > 8;
-            const gridCols = problemElements.length > 15 ? 'grid-cols-3' : (hasManyProblems ? 'grid-cols-2' : 'grid-cols-1');
+            const isVeryHighDensity = problemElements.length > 15;
+            const gridCols = isVeryHighDensity ? 'grid-cols-3' : (hasManyProblems ? 'grid-cols-2' : 'grid-cols-1');
 
             let currentProblemIndex = 0;
 
             return (
-              <div className={`grid ${gridCols} gap-x-12 gap-y-8 w-full`}>
+              <div className={`grid ${gridCols} ${isVeryHighDensity ? 'gap-x-6 gap-y-4' : 'gap-x-12 gap-y-8'} w-full`}>
                 {flowElements.map((el, idx) => {
                   const content = el.mirroredContent || el.content;
                   if (el.type === 'white_space') return null;
@@ -903,7 +906,7 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                   const isInstruction = el.type === 'instruction';
 
                   // Instructions should span all columns
-                  const colSpan = isInstruction ? (problemElements.length > 15 ? 'col-span-3' : (hasManyProblems ? 'col-span-2' : 'col-span-1')) : 'col-span-1';
+                  const colSpan = isInstruction ? (isVeryHighDensity ? 'col-span-3' : (hasManyProblems ? 'col-span-2' : 'col-span-1')) : 'col-span-1';
 
                   return (
                     <div key={el.id || idx} className={`${colSpan} w-full relative`}>
@@ -923,7 +926,7 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
 
                             <div className="flex-1 space-y-2">
                               {/* Main Content */}
-                              <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'} ${isInstruction ? 'font-medium italic border-l-4 border-slate-200 pl-4 py-1 pb-4' : ''}`}>
+                              <div className={`${isVeryHighDensity ? 'text-base' : 'text-lg'} leading-relaxed ${el.type === 'problem' ? (isVeryHighDensity ? 'font-serif text-slate-900 text-lg' : 'font-serif text-slate-900 text-xl') : 'text-slate-800'} ${isInstruction ? 'font-medium italic border-l-4 border-slate-200 pl-4 py-1 pb-4' : ''}`}>
                                 <SmartMathRenderer text={content} />
                               </div>
 
