@@ -57,6 +57,7 @@ serve(async (req) => {
            - **STRICT REQUIREMENT**: Provide RAW LaTeX ONLY for 'problem' types.
            - **DO NOT** use delimiters like \\( ... \\), $ ... $, or \\[ ... \\] in the 'Content', 'Mirrored', or 'Solution' fields.
            - For 'word_problem' types, write natural text. The system will automatically detect and render any math variables (e.g., x, y) or expressions.
+           - **NO UNICODE MATH**: Do NOT use characters like ∑, √, ∫. Always use LaTeX commands like \\sum, \\sqrt, \\int.
            - Formatting should be clean and compatible with KaTeX (e.g., use \\frac instead of /).
            - Example: "x^2 + y = 10" instead of "\\( x^2 + y = 10 \\)".
         2. **STOP CONDITION**: Stop after the last visible printed problem. Ignore student handwriting/marks.
@@ -116,9 +117,10 @@ serve(async (req) => {
 RULES:
 1. CONTENT for 'problem' types must be ** PURE LATEX ONLY **. NO TEXT. NO "Calculate". NO "Solve".
 2. CONTENT for 'word_problem' types must use \\(... \\) around ALL math expressions.
-3. Keep mathematical notation consistent and professional.
-4. Maintain proper sentence structure and spacing in word problems.
-5. Do NOT use command words like 'Solve' in 'problem' content. Just the expression.
+3. **NO UNICODE MATH**: Always use \\sum instead of ∑, \\sqrt instead of √, etc.
+4. Keep mathematical notation consistent and professional.
+5. Maintain proper sentence structure and spacing in word problems.
+6. Do NOT use command words like 'Solve' in 'problem' content. Just the expression.
         6. ** ABSOLUTELY CRITICAL **: You MUST provide a "Solution" for every problem. 
            - For numerical problems, provide the final number or expression.
            - For word problems, providing the final answer + a very brief 1 - sentence explanation of the logic.

@@ -107,6 +107,23 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
         // Robustness: Strip delimiters if they were accidentally passed in
         // Handles \(...\), \[...\], $...$, and $$...$$
         let math = tex.trim();
+
+        // Robustness: Pre-process common Unicode symbols AI might return into LaTeX
+        // This is a safety layer for "Identify-First" logic
+        math = math
+          .replace(/∑/g, '\\sum ')
+          .replace(/√/g, '\\sqrt ')
+          .replace(/∫/g, '\\int ')
+          .replace(/∞/g, '\\infty ')
+          .replace(/α/g, '\\alpha ')
+          .replace(/β/g, '\\beta ')
+          .replace(/π/g, '\\pi ')
+          .replace(/θ/g, '\\theta ')
+          .replace(/±/g, '\\pm ')
+          .replace(/≤/g, '\\le ')
+          .replace(/≥/g, '\\ge ')
+          .replace(/≠/g, '\\ne ');
+
         while (
           (math.startsWith('\\(') && math.endsWith('\\)')) ||
           (math.startsWith('\\[') && math.endsWith('\\]')) ||
@@ -188,7 +205,8 @@ const SmartMathRenderer: React.FC<{ text: string; className?: string; safe?: boo
   const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g;
 
   // Professional-grade regex for mixed academic content identification (Identify-First)
-  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+|\\(?:[a-zA-Z]+)(?:\{[^{}]*\}|\[[^[\]]*\])*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
+  // Refined to correctly group LaTeX commands with their suffixes (arguments, subscripts, superscripts)
+  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{[^{}]*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{[^{}]*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
 
   const tokenRegex = safe ? delimitedRegex : professionalRegex;
   const parts = text.split(tokenRegex);
