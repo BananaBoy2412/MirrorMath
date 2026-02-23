@@ -254,12 +254,12 @@ const SmartMathRenderer: React.FC<{ text: string; className?: string; safe?: boo
           if (/^(Find|when|and|Assume|both|are|of|the|is|if|for|with|in|to|on|at|by)$/i.test(token.content.trim())) {
             return <span key={index}>{token.content}</span>;
           }
-
           return <MathText key={index} tex={token.content} inline={!(token.content.includes('\\[') || token.content.includes('$$'))} />;
         }
 
-        // Return regular text, unescaping \$ back to $
-        return <span key={index}>{token.content.replace(/\\(\$)/g, '$')}</span>;
+        // Unescape dollar signs for text parts (compatibility with old convention)
+        const displayContent = token.content.replace(/\\(\$)/g, '$');
+        return <span key={index}>{displayContent}</span>;
       })}
     </span>
   );
@@ -1001,21 +1001,14 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                   // No inner flex needed usually, but keeps text flow standard
                 }}
               >
-                {el.type === 'problem' ? (
-                  <div className="w-full inline-block" style={{ lineHeight: '1.2', overflow: 'visible' }}>
+                {(el.type === 'problem' || el.type === 'word_problem') ? (
+                  <div className={`w-full inline-block ${el.type === 'word_problem' ? 'text-slate-800' : ''}`}
+                    style={{ lineHeight: el.type === 'word_problem' ? '1.6' : '1.2', overflow: 'visible', whiteSpace: 'pre-wrap' }}>
                     {content ? (
-                      layoutMode === 'absolute' ? (
-                        <MathText tex={content} />
-                      ) : (
-                        <SmartMathRenderer text={content} />
-                      )
+                      <SmartMathRenderer text={content} safe={layoutMode === 'absolute'} />
                     ) : (
-                      <div className="text-slate-300 italic text-[10px]">Empty problem</div>
+                      <div className="text-slate-300 italic text-[10px]">Empty element</div>
                     )}
-                  </div>
-                ) : el.type === 'word_problem' ? (
-                  <div className="w-full inline-block text-slate-800" style={{ whiteSpace: 'pre-wrap' }}>
-                    <SmartMathRenderer text={content} safe={layoutMode === 'absolute'} />
                   </div>
                 ) : el.type === 'diagram' ? (
                   <div className="w-full h-full relative overflow-visible">
