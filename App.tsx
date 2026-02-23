@@ -173,70 +173,51 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
   );
 };
 
-// Parses text with \( ... \) and \[ ... \] delimiters and renders mixed content
-// Parses text with \( ... \) and \[ ... \] delimiters and renders mixed content
-// Also converts underscore sequences (e.g. ___) into clean border-bottom lines
-// --- CONSTANTS & SHARED UTILS ---
+// --- PROFESSIONAL MATH RENDERING SYSTEM ---
 
 /**
- * AUTO-FORMATTING HELPER: 
- * Detects LaTeX/Math in text and ensures it's wrapped in \( ... \)
- * Used primarily for Mirrorer parsing to ensure reliability.
+ * SMART MATH RENDERER:
+ * A professional-grade component for rendering mixed text and math.
+ * Uses a tokenization engine to identify math, lines, and text in one pass.
  */
-const autoFormatMath = (text: string): string => {
-  if (!text) return "";
-  let processed = text;
-
-  // 1. Process the text to identify math patterns
-  // We no longer skip if delimiters are present, because we want to catch "naked" math 
-  // that might be mixed with already-delimited math.
-
-  // 2. Wrap chunks that look like math but lack delimiters
-  // This detects:
-  // - Algebraic terms like 2x, x^2, y_1, dy/dx
-  // - Derivatives like dy/dz or da/dk
-  // Improved regex: Includes common math characters and ensures we don't wrap plain words.
-  return processed.replace(/(\\[a-zA-Z]+(?:\[[^[\]]*\])?(?:\{[^{}]*\}|\s*[\^_](?:\{[^{}]*\}|[a-zA-Z0-9]+)|\s+)*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z][\^_][a-zA-Z0-9]+|(?:\([^()]+\))\s*[=<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+\/[\d.]+|[a-zA-Z]\b\s*=\s*[\d.]+|[\d.]+\s*=\s*[a-zA-Z]\b|\b[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g, (match) => {
-    // Skip if it is a common word in the context of instructions
-    if (/^(Find|when|and|Assume|both|are|of|the|is|if|for|with|in|to|on|at|by)$/i.test(match.trim())) return match;
-
-    // Skip if it's just a common word or standalone number
-    if (!/[\\]|[\^_{}=/*+\-<>\/]/.test(match) && match.length < 2) return match;
-
-    // Heuristic: If it's a known math pattern but missing delimiters, wrap it
-    return ` \\(${match.trim()}\\) `;
-  }).replace(/\s+/g, ' ').trim();
-};
-
-const RichTextRenderer: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => {
+const SmartMathRenderer: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => {
   if (!text) return null;
 
-  // Split by existing LaTeX delimiters (\( \), \[ \]), Double Dollar ($$ $$), Single Dollar ($ $), and underscore sequences (2 or more)
-  // CRITICAL FIX: Use [\s\S] instead of . to match newlines in LaTeX blocks
-  const initialParts = text.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g);
+  // 1. TOKENIZATION ENGINE
+  // Professional-grade regex for mixed academic content identification
+  const tokenRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+|\\(?:[a-zA-Z]+)(?:\{[^{}]*\}|\[[^[\]]*\])*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
+
+  const parts = text.split(tokenRegex);
+  const matches = text.match(tokenRegex) || [];
+
+  // Reconstruct the tokens with their original types
+  const tokens: { type: 'text' | 'math' | 'line'; content: string }[] = [];
+  let matchIndex = 0;
+
+  parts.forEach((part, i) => {
+    if (i % 2 === 0) {
+      if (part) tokens.push({ type: 'text', content: part });
+    } else {
+      const match = matches[matchIndex++];
+      if (match.startsWith('__')) {
+        tokens.push({ type: 'line', content: match });
+      } else {
+        // It's math (either delimited or naked)
+        tokens.push({ type: 'math', content: match });
+      }
+    }
+  });
 
   return (
     <span className={className}>
-      {initialParts.map((part, index) => {
-        const trimmed = part.trim();
-        // 1. If it's already a delimited math block, render it
-        if (
-          (trimmed.startsWith('\\(') && trimmed.endsWith('\\)')) ||
-          (trimmed.startsWith('\\[') && trimmed.endsWith('\\]')) ||
-          (trimmed.startsWith('$$') && trimmed.endsWith('$$')) ||
-          (trimmed.startsWith('$') && trimmed.endsWith('$'))
-        ) {
-          return <MathText key={`math-${index}`} tex={trimmed} inline={!(trimmed.includes('\\[') || trimmed.includes('$$'))} />;
-        }
-
-        // 2. If it's an underscore line, render it
-        if (part.startsWith('__')) {
+      {tokens.map((token, index) => {
+        if (token.type === 'line') {
           return (
             <span
-              key={`line-${index}`}
+              key={index}
               className="border-b-2 border-slate-300 mx-1"
               style={{
-                width: `${part.length * 8}px`,
+                width: `${token.content.length * 8}px`,
                 minWidth: '40px',
                 display: 'inline-block',
                 verticalAlign: 'baseline',
@@ -246,26 +227,25 @@ const RichTextRenderer: React.FC<{ text: string; className?: string }> = ({ text
           );
         }
 
-        // 3. Otherwise, it's plain text - run autoFormatMath on it to catch "naked" math
-        const formatted = autoFormatMath(part);
-        const subParts = formatted.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
-
-        return subParts.map((subPart, subIndex) => {
-          const subTrimmed = subPart.trim();
-          if (
-            (subTrimmed.startsWith('\\(') && subTrimmed.endsWith('\\)')) ||
-            (subTrimmed.startsWith('\\[') && subTrimmed.endsWith('\\]')) ||
-            (subTrimmed.startsWith('$$') && subTrimmed.endsWith('$$')) ||
-            (subTrimmed.startsWith('$') && subTrimmed.endsWith('$'))
-          ) {
-            return <MathText key={`sub-math-${index}-${subIndex}`} tex={subTrimmed} inline={!(subTrimmed.includes('\\[') || subTrimmed.includes('$$'))} />;
+        if (token.type === 'math') {
+          // Heuristic: Some common words might be caught by the naked math regex
+          if (/^(Find|when|and|Assume|both|are|of|the|is|if|for|with|in|to|on|at|by)$/i.test(token.content.trim())) {
+            return <span key={index}>{token.content}</span>;
           }
-          return <span key={`text-${index}-${subIndex}`}>{subPart.replace(/\\(\$)/g, '$')}</span>;
-        });
+
+          return <MathText key={index} tex={token.content} inline={!(token.content.includes('\\[') || token.content.includes('$$'))} />;
+        }
+
+        // Return regular text, unescaping \$ back to $
+        return <span key={index}>{token.content.replace(/\\(\$)/g, '$')}</span>;
       })}
     </span>
   );
 };
+
+// Legacy alias for compatibility during migration
+const RichTextRenderer = SmartMathRenderer;
+const autoFormatMath = (text: string) => text; // Deprecated, SmartMathRenderer handles it internally
 
 
 // --- Logo Component moved to src/components/Logo.tsx ---
@@ -1000,9 +980,9 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                 }}
               >
                 {el.type === 'problem' ? (
-                  <div className="w-full inline-block" style={{ lineHeight: '1', overflow: 'visible' }}>
+                  <div className="w-full inline-block" style={{ lineHeight: '1.2', overflow: 'visible' }}>
                     {content ? (
-                      <MathText tex={content} />
+                      <SmartMathRenderer text={content} />
                     ) : (
                       <div className="text-slate-300 italic text-[10px]">Empty problem</div>
                     )}
