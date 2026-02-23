@@ -180,13 +180,17 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
  * A professional-grade component for rendering mixed text and math.
  * Uses a tokenization engine to identify math, lines, and text in one pass.
  */
-const SmartMathRenderer: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => {
+const SmartMathRenderer: React.FC<{ text: string; className?: string; safe?: boolean }> = ({ text, className = "", safe = false }) => {
   if (!text) return null;
 
   // 1. TOKENIZATION ENGINE
-  // Professional-grade regex for mixed academic content identification
-  const tokenRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+|\\(?:[a-zA-Z]+)(?:\{[^{}]*\}|\[[^[\]]*\])*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
+  // Safe mode only identifies explicit delimiters and underscores
+  const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g;
 
+  // Professional-grade regex for mixed academic content identification (Identify-First)
+  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+|\\(?:[a-zA-Z]+)(?:\{[^{}]*\}|\[[^[\]]*\])*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
+
+  const tokenRegex = safe ? delimitedRegex : professionalRegex;
   const parts = text.split(tokenRegex);
   const matches = text.match(tokenRegex) || [];
 
@@ -982,14 +986,18 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                 {el.type === 'problem' ? (
                   <div className="w-full inline-block" style={{ lineHeight: '1.2', overflow: 'visible' }}>
                     {content ? (
-                      <SmartMathRenderer text={content} />
+                      layoutMode === 'absolute' ? (
+                        <MathText tex={content} />
+                      ) : (
+                        <SmartMathRenderer text={content} />
+                      )
                     ) : (
                       <div className="text-slate-300 italic text-[10px]">Empty problem</div>
                     )}
                   </div>
                 ) : el.type === 'word_problem' ? (
                   <div className="w-full inline-block text-slate-800" style={{ whiteSpace: 'pre-wrap' }}>
-                    <RichTextRenderer text={content} />
+                    <SmartMathRenderer text={content} safe={layoutMode === 'absolute'} />
                   </div>
                 ) : el.type === 'diagram' ? (
                   <div className="w-full h-full relative overflow-visible">

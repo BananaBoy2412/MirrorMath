@@ -115,8 +115,8 @@ serve(async (req) => {
 
 RULES:
 1. CONTENT for 'problem' types must be ** PURE LATEX ONLY **. NO TEXT. NO "Calculate". NO "Solve".
-2. CONTENT for 'word_problem' types should be natural text.
-3. Do NOT use delimiters like \\( ... \\) or $ ... $ anymore. The system identifies math automatically.
+2. CONTENT for 'word_problem' types must use \\(... \\) around ALL math expressions.
+3. Keep mathematical notation consistent and professional.
 4. Maintain proper sentence structure and spacing in word problems.
 5. Do NOT use command words like 'Solve' in 'problem' content. Just the expression.
         6. ** ABSOLUTELY CRITICAL **: You MUST provide a "Solution" for every problem. 
