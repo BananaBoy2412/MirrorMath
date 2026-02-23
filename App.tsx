@@ -110,6 +110,7 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
         while (
           (math.startsWith('\\(') && math.endsWith('\\)')) ||
           (math.startsWith('\\[') && math.endsWith('\\]')) ||
+          (math.startsWith('$$') && math.endsWith('$$')) ||
           (math.startsWith('$') && math.endsWith('$'))
         ) {
           if (math.startsWith('\\(')) math = math.slice(2, -2).trim();
@@ -119,6 +120,12 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
         }
 
         let styledTex = math.trim();
+        // Fallback for empty math
+        if (!styledTex) {
+          containerRef.current.innerHTML = "";
+          return;
+        }
+
         if (!inline) {
           styledTex = styledTex.startsWith('\\displaystyle') ? styledTex : `\\displaystyle{ ${styledTex} }`;
         } else {
@@ -178,13 +185,13 @@ const autoFormatMath = (text: string): string => {
 
   // 2. Wrap chunks that look like math but lack delimiters
   // This detects:
-  // - LaTeX commands starting with \ (e.g. \frac, \sqrt, \alpha)
+  // - LaTeX commands starting with \ (e.g. \frac, \sqrt)
   // - Expressions with common operators (+, -, *, =, ^, _, <, >, ≤, ≥)
-  // - Algebraic terms like 2x, x^2, y_1
-  // - Fractions like 1/2 or expressions like (x+1)/(x-1)
-  return processed.replace(/(\\[a-zA-Z]+(?:\[[^[\]]*\])?(?:\{[^{}]*\}|\s*[\^_](?:\{[^{}]*\}|[a-zA-Z0-9]+)|\s+)*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z][\^_][a-zA-Z0-9]+|(?:\([^()]+\))\s*[=<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\))))/g, (match) => {
+  // - Algebraic terms like 2x, x^2, y_1, dy/dx
+  // Improved regex: Includes common math characters and ensures we don't wrap plain words.
+  return processed.replace(/(\\[a-zA-Z]+(?:\[[^[\]]*\])?(?:\{[^{}]*\}|\s*[\^_](?:\{[^{}]*\}|[a-zA-Z0-9]+)|\s+)*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z][\^_][a-zA-Z0-9]+|(?:\([^()]+\))\s*[=<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+\/[\d.]+|[a-zA-Z]\b\s*=\s*[\d.]+|[\d.]+\s*=\s*[a-zA-Z]\b|\b[a-zA-Z]\b[\^_{][a-zA-Z0-9]+)/g, (match) => {
     // Skip if it's just a common word or standalone number
-    if (!/[\\]|[\^_{}=/*+\-<>]/.test(match) && match.length < 2) return match;
+    if (!/[\\]|[\^_{}=/*+\-<>\/]/.test(match) && match.length < 2) return match;
 
     // Heuristic: If it's a known math pattern but missing delimiters, wrap it
     return ` \\(${match.trim()}\\) `;
@@ -194,30 +201,28 @@ const autoFormatMath = (text: string): string => {
 const RichTextRenderer: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => {
   if (!text) return null;
 
+  // FAIL-SAFE: Ensure all math in the text is properly delimited before rendering
+  // This handles AI output that mixes text and raw LaTeX without delimiters.
+  const formattedText = autoFormatMath(text);
+
   // Split by LaTeX delimiters (\( \), \[ \]), Double Dollar ($$ $$), Single Dollar ($ $), and underscore sequences (2 or more)
   // CRITICAL FIX: Use [\s\S] instead of . to match newlines in LaTeX blocks
-  const parts = text.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g);
+  const parts = formattedText.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g);
 
   return (
     <span className={className}>
       {parts.map((part, index) => {
         const trimmed = part.trim();
-        if (trimmed.startsWith('\\(') && trimmed.endsWith('\\)')) {
-          const mathContent = trimmed.slice(2, -2);
-          return <MathText key={index} tex={mathContent} inline={true} />;
+        // Check for common LaTeX delimiters
+        if (
+          (trimmed.startsWith('\\(') && trimmed.endsWith('\\)')) ||
+          (trimmed.startsWith('\\[') && trimmed.endsWith('\\]')) ||
+          (trimmed.startsWith('$$') && trimmed.endsWith('$$')) ||
+          (trimmed.startsWith('$') && trimmed.endsWith('$'))
+        ) {
+          return <MathText key={index} tex={trimmed} inline={!(trimmed.includes('\\[') || trimmed.includes('$$'))} />;
         }
-        if (trimmed.startsWith('\\\[') && trimmed.endsWith('\\\]')) {
-          const mathContent = trimmed.slice(2, -2);
-          return <MathText key={index} tex={mathContent} inline={false} />;
-        }
-        if (trimmed.startsWith('$$') && trimmed.endsWith('$$')) {
-          const mathContent = trimmed.slice(2, -2);
-          return <MathText key={index} tex={mathContent} inline={false} />;
-        }
-        if (trimmed.startsWith('$') && trimmed.endsWith('$')) {
-          const mathContent = trimmed.slice(1, -1);
-          return <MathText key={index} tex={mathContent} inline={true} />;
-        }
+
         if (part.startsWith('__')) {
           // Identify underscores and replace with a professional line
           // width: ~8px per underscore
@@ -1425,21 +1430,13 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
                     <div className="space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Original Logic</h4>
                       <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic">
-                        {el.type === 'problem' ? (
-                          <MathText tex={el.content || ""} className="text-slate-600 dark:text-slate-300" />
-                        ) : (
-                          <RichTextRenderer text={el.content || ""} />
-                        )}
+                        <RichTextRenderer text={el.content || ""} className="text-slate-600 dark:text-slate-300" />
                       </div>
                     </div>
                     <div className="space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-widest text-sky-500">Mirrored Reflection</h4>
                       <div className="p-5 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl text-slate-800 dark:text-white font-bold text-lg leading-relaxed shadow-sm">
-                        {el.type === 'problem' ? (
-                          <MathText tex={el.mirroredContent || ""} className="dark:text-slate-200" />
-                        ) : (
-                          <RichTextRenderer text={el.mirroredContent || ""} />
-                        )}
+                        <RichTextRenderer text={el.mirroredContent || ""} className="dark:text-slate-200" />
                       </div>
                     </div>
                   </div>
@@ -1447,11 +1444,7 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
                   <div className="space-y-3">
                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Problem Content</h4>
                     <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-slate-800 dark:text-white font-bold text-xl leading-relaxed">
-                      {el.type === 'problem' ? (
-                        <MathText tex={el.content || ""} className="text-xl" />
-                      ) : (
-                        <RichTextRenderer text={el.content || ""} />
-                      )}
+                      <RichTextRenderer text={el.content || ""} className="text-xl" />
                     </div>
                   </div>
                 )}
@@ -1485,13 +1478,13 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
                     <div className="space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Original Logic</h4>
                       <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic">
-                        <MathText tex={prob.original || ""} className="text-slate-600 dark:text-slate-300" />
+                        <RichTextRenderer text={prob.original || ""} className="text-slate-600 dark:text-slate-300" />
                       </div>
                     </div>
                     <div className="space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-widest text-sky-500">Mirrored Reflection</h4>
                       <div className="p-5 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl text-slate-800 dark:text-white font-bold text-lg leading-relaxed shadow-sm">
-                        <MathText tex={prob.mirrored} className="dark:text-slate-200" />
+                        <RichTextRenderer text={prob.mirrored || ""} className="dark:text-slate-200" />
                       </div>
                     </div>
                   </div>
@@ -1499,7 +1492,7 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
                   <div className="space-y-3">
                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Problem Content</h4>
                     <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-slate-800 dark:text-white font-bold text-xl leading-relaxed">
-                      <MathText tex={prob.mirrored} className="text-xl" />
+                      <RichTextRenderer text={prob.mirrored || ""} className="text-xl" />
                     </div>
                   </div>
                 )}
