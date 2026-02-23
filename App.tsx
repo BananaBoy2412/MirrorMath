@@ -114,21 +114,23 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
         // Robustness: Translate tabular (not supported by KaTeX) to array (supported)
         math = math
           .replace(/\\begin\{tabular\}/gi, '\\\\begin{array}')
-          .replace(/\\end\{tabular\}/gi, '\\\\end{array}');
+          .replace(/\\end\{tabular\}/gi, '\\\\end{array}')
+          .replace(/\\\\\$/g, '$'); // Unescape dollar signs
 
+        // Safety: Ensure common Unicode math symbols are treated correctly
         math = math
-          .replace(/∑/g, '\\sum ')
-          .replace(/√/g, '\\sqrt ')
-          .replace(/∫/g, '\\int ')
-          .replace(/∞/g, '\\infty ')
-          .replace(/α/g, '\\alpha ')
-          .replace(/β/g, '\\beta ')
-          .replace(/π/g, '\\pi ')
-          .replace(/θ/g, '\\theta ')
-          .replace(/±/g, '\\pm ')
-          .replace(/≤/g, '\\le ')
-          .replace(/≥/g, '\\ge ')
-          .replace(/≠/g, '\\ne ');
+          .replace(/∫/g, '\\\\int ')
+          .replace(/∑/g, '\\\\sum ')
+          .replace(/√/g, '\\\\sqrt ')
+          .replace(/∞/g, '\\\\infty ')
+          .replace(/α/g, '\\\\alpha ')
+          .replace(/β/g, '\\\\beta ')
+          .replace(/π/g, '\\\\pi ')
+          .replace(/θ/g, '\\\\theta ')
+          .replace(/±/g, '\\\\pm ')
+          .replace(/≤/g, '\\\\le ')
+          .replace(/≥/g, '\\\\ge ')
+          .replace(/≠/g, '\\\\ne ');
 
         while (
           (math.startsWith('\\(') && math.endsWith('\\)')) ||
@@ -208,12 +210,11 @@ const SmartMathRenderer: React.FC<{ text: string; className?: string; safe?: boo
 
   // 1. TOKENIZATION ENGINE
   // Safe mode only identifies explicit delimiters, environments, and underscores
-  // Simplified environment regex to be more robust against nested specifiers
   const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+)/g;
 
   // Professional-grade regex for mixed academic content identification (Identify-First)
-  // Refined to support LaTeX environments and group commands with their suffixes
-  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{[^{}]*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{[^{}]*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
+  // UPGRADED: Robustly supports nested braces (up to 3 levels) for complex calculus/fractions and Unicode symbols
+  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+|[∫∑√∞αβπθ±≤≥≠]|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
 
   const tokenRegex = safe ? delimitedRegex : professionalRegex;
   const parts = text.split(tokenRegex);
@@ -890,14 +891,14 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
           {(() => {
             const flowElements = sortedElements.filter(el => el.type !== 'header' && el.type !== 'section_header');
             const problemElements = flowElements.filter(el => el.type === 'problem' || el.type === 'word_problem');
-            const hasManyProblems = problemElements.length > 8;
-            const isVeryHighDensity = problemElements.length > 15;
-            const gridCols = isVeryHighDensity ? 'grid-cols-3' : (hasManyProblems ? 'grid-cols-2' : 'grid-cols-1');
+            const isHighDensity = problemElements.length > 10;
+            const isVeryHighDensity = problemElements.length > 20;
+            const gridCols = isVeryHighDensity ? 'grid-cols-3' : (isHighDensity ? 'grid-cols-2' : 'grid-cols-1');
 
             let currentProblemIndex = 0;
 
             return (
-              <div className={`grid ${gridCols} ${isVeryHighDensity ? 'gap-x-6 gap-y-4' : 'gap-x-12 gap-y-8'} w-full`}>
+              <div className={`grid ${gridCols} ${isVeryHighDensity ? 'gap-x-4 gap-y-2' : (isHighDensity ? 'gap-x-8 gap-y-6' : 'gap-x-12 gap-y-8')} w-full`}>
                 {flowElements.map((el, idx) => {
                   const content = el.mirroredContent || el.content;
                   if (el.type === 'white_space') return null;
@@ -906,7 +907,7 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                   const isInstruction = el.type === 'instruction';
 
                   // Instructions should span all columns
-                  const colSpan = isInstruction ? (isVeryHighDensity ? 'col-span-3' : (hasManyProblems ? 'col-span-2' : 'col-span-1')) : 'col-span-1';
+                  const colSpan = isInstruction ? (isVeryHighDensity ? 'col-span-3' : (isHighDensity ? 'col-span-2' : 'col-span-1')) : ''; // Default to no col-span for problems
 
                   return (
                     <div key={el.id || idx} className={`${colSpan} w-full relative`}>
@@ -914,9 +915,9 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                         if (el.type === 'white_space') return <div className="h-4" />;
 
                         return (
-                          <div className="flex gap-4 items-start group">
+                          <div className={`flex ${isVeryHighDensity ? 'gap-2' : 'gap-4'} items-start group`}>
                             {isProblem && (
-                              <div className="text-sky-600 font-bold text-xl min-w-[2.5rem] pt-1">
+                              <div className={`text-sky-600 font-bold ${isVeryHighDensity ? 'text-lg min-w-[1.5rem]' : 'text-xl min-w-[2.5rem]'} pt-1`}>
                                 {el.type === 'question_number' ? content.replace('.', '') : (() => {
                                   currentProblemIndex++;
                                   return currentProblemIndex;
@@ -924,9 +925,9 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                               </div>
                             )}
 
-                            <div className="flex-1 space-y-2">
+                            <div className={`flex-1 ${isVeryHighDensity ? 'space-y-0.5' : 'space-y-2'}`}>
                               {/* Main Content */}
-                              <div className={`${isVeryHighDensity ? 'text-base' : 'text-lg'} leading-relaxed ${el.type === 'problem' ? (isVeryHighDensity ? 'font-serif text-slate-900 text-lg' : 'font-serif text-slate-900 text-xl') : 'text-slate-800'} ${isInstruction ? 'font-medium italic border-l-4 border-slate-200 pl-4 py-1 pb-4' : ''}`}>
+                              <div className={`${isVeryHighDensity ? 'text-sm' : (isHighDensity ? 'text-base' : 'text-lg')} leading-relaxed ${el.type === 'problem' ? (isVeryHighDensity ? 'font-serif text-slate-900 text-base' : 'font-serif text-slate-900 text-xl') : 'text-slate-800'} ${isInstruction ? 'font-medium italic border-l-4 border-slate-200 pl-4 py-1 pb-4' : ''}`}>
                                 <SmartMathRenderer text={content} />
                               </div>
 
