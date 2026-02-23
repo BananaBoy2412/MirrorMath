@@ -58,6 +58,8 @@ serve(async (req) => {
            - **DO NOT** use delimiters like \\( ... \\), $ ... $, or \\[ ... \\] in the 'Content', 'Mirrored', or 'Solution' fields.
            - For 'word_problem' types, write natural text. The system will automatically detect and render any math variables (e.g., x, y) or expressions.
            - **NO UNICODE MATH**: Do NOT use characters like ∑, √, ∫. Always use LaTeX commands like \\sum, \\sqrt, \\int.
+           - **VERTICAL MATH**: For vertical arithmetic (multiplication/addition), use the LaTeX 'array' environment (NOT 'tabular').
+             Example: "\\begin{array}{r} 123 \\\\ \\times 45 \\\\ \\hline 5535 \\end{array}"
            - Formatting should be clean and compatible with KaTeX (e.g., use \\frac instead of /).
            - Example: "x^2 + y = 10" instead of "\\( x^2 + y = 10 \\)".
         2. **STOP CONDITION**: Stop after the last visible printed problem. Ignore student handwriting/marks.

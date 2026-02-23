@@ -110,6 +110,11 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
 
         // Robustness: Pre-process common Unicode symbols AI might return into LaTeX
         // This is a safety layer for "Identify-First" logic
+        // Robustness: Translate tabular (not supported by KaTeX) to array (supported)
+        math = math
+          .replace(/\\begin\{tabular\}/g, '\\begin{array}')
+          .replace(/\\end\{tabular\}/g, '\\end{array}');
+
         math = math
           .replace(/∑/g, '\\sum ')
           .replace(/√/g, '\\sqrt ')
@@ -201,12 +206,12 @@ const SmartMathRenderer: React.FC<{ text: string; className?: string; safe?: boo
   if (!text) return null;
 
   // 1. TOKENIZATION ENGINE
-  // Safe mode only identifies explicit delimiters, environments, and underscores
-  const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+)/g;
+  // Safe mode only identifies explicit delimiters, environments (with args), and underscores
+  const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}(?:\{[^{}]*\}|\[[^[\]]*\])*[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+)/g;
 
   // Professional-grade regex for mixed academic content identification (Identify-First)
-  // Refined to support LaTeX environments and group commands with their suffixes
-  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{[^{}]*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{[^{}]*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
+  // Refined to support LaTeX environments with arguments and group commands with their suffixes
+  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}(?:\{[^{}]*\}|\[[^[\]]*\])*[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{[^{}]*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{[^{}]*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
 
   const tokenRegex = safe ? delimitedRegex : professionalRegex;
   const parts = text.split(tokenRegex);
@@ -882,66 +887,80 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
           {/* 2. PROBLEMS LIST */}
           {(() => {
             const flowElements = sortedElements.filter(el => el.type !== 'header' && el.type !== 'section_header');
-            let problemCounter = 0;
+            const problemElements = flowElements.filter(el => el.type === 'problem' || el.type === 'word_problem');
+            const hasManyProblems = problemElements.length > 8;
+            const gridCols = problemElements.length > 15 ? 'grid-cols-3' : (hasManyProblems ? 'grid-cols-2' : 'grid-cols-1');
 
-            return flowElements.map((el, idx) => (
+            let currentProblemIndex = 0;
 
-              <div key={el.id || idx} className="w-full relative">
-                {/* Standard Element Rendering for Flow */}
-                {(() => {
+            return (
+              <div className={`grid ${gridCols} gap-x-12 gap-y-8 w-full`}>
+                {flowElements.map((el, idx) => {
                   const content = el.mirroredContent || el.content;
+                  if (el.type === 'white_space') return null;
 
-                  if (el.type === 'white_space') return <div className="h-4" />; // Reduce whitespace
+                  const isProblem = el.type === 'problem' || el.type === 'word_problem' || el.type === 'question_number';
+                  const isInstruction = el.type === 'instruction';
+
+                  // Instructions should span all columns
+                  const colSpan = isInstruction ? (problemElements.length > 15 ? 'col-span-3' : (hasManyProblems ? 'col-span-2' : 'col-span-1')) : 'col-span-1';
 
                   return (
-                    <div className="flex gap-4 items-start group">
-                      {/* Question Number or Auto-Numbering for Problems */}
-                      {(el.type === 'problem' || el.type === 'word_problem' || el.type === 'question_number') && (
-                        <div className="text-sky-600 font-bold text-xl min-w-[2.5rem] pt-1">
-                          {el.type === 'question_number' ? content.replace('.', '') : (() => {
-                            problemCounter++;
-                            return problemCounter;
-                          })()}.
-                        </div>
-                      )}
+                    <div key={el.id || idx} className={`${colSpan} w-full relative`}>
+                      {(() => {
+                        if (el.type === 'white_space') return <div className="h-4" />;
 
-                      <div className="flex-1 space-y-2">
-                        {/* Main Content */}
-                        <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'}`}>
-                          <RichTextRenderer text={content} />
-                        </div>
-
-                        {/* SVG or Diagram Rendering */}
-                        {el.type === 'diagram' && (
-                          <div className="w-full py-4 flex justify-center">
-                            {el.svgContent ? (
-                              <div
-                                className="max-w-md w-full bg-white p-4 rounded-lg border border-slate-100 shadow-sm"
-                                dangerouslySetInnerHTML={{ __html: el.svgContent }}
-                              />
-                            ) : (
-                              <div className="border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 h-48 w-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">
-                                Diagram Placeholder
+                        return (
+                          <div className="flex gap-4 items-start group">
+                            {isProblem && (
+                              <div className="text-sky-600 font-bold text-xl min-w-[2.5rem] pt-1">
+                                {el.type === 'question_number' ? content.replace('.', '') : (() => {
+                                  currentProblemIndex++;
+                                  return currentProblemIndex;
+                                })()}.
                               </div>
                             )}
-                          </div>
-                        )}
 
-                        {/* Answer Key (Hidden by default) */}
-                        {showAnswers && el.solution && (
-                          <div className="mt-2 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg inline-block">
-                            <div className="text-[10px] font-black uppercase text-emerald-600 tracking-wider mb-1">Solution</div>
-                            <div className="text-emerald-900 font-bold text-sm">
-                              <RichTextRenderer text={el.solution} />
+                            <div className="flex-1 space-y-2">
+                              {/* Main Content */}
+                              <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'} ${isInstruction ? 'font-medium italic border-l-4 border-slate-200 pl-4 py-1 pb-4' : ''}`}>
+                                <SmartMathRenderer text={content} />
+                              </div>
+
+                              {/* SVG or Diagram Rendering */}
+                              {el.type === 'diagram' && (
+                                <div className="w-full py-4 flex justify-center">
+                                  {el.svgContent ? (
+                                    <div
+                                      className="max-w-md w-full bg-white p-4 rounded-lg border border-slate-100 shadow-sm"
+                                      dangerouslySetInnerHTML={{ __html: el.svgContent }}
+                                    />
+                                  ) : (
+                                    <div className="border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 h-48 w-full flex items-center justify-center text-slate-400 font-bold uppercase text-xs tracking-widest">
+                                      Diagram Placeholder
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Answer Key (Hidden by default) */}
+                              {showAnswers && el.solution && (
+                                <div className="mt-2 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg inline-block">
+                                  <div className="text-[10px] font-black uppercase text-emerald-600 tracking-wider mb-1">Solution</div>
+                                  <div className="text-emerald-900 font-bold text-sm">
+                                    <SmartMathRenderer text={el.solution} />
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </div>
                   );
-                })()}
+                })}
               </div>
-            ));
+            );
           })()}
         </div>
       ) : (
