@@ -104,11 +104,21 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
   useEffect(() => {
     if (containerRef.current) {
       try {
-        let styledTex = tex;
+        // Robustness: Strip delimiters if they were accidentally passed in
+        // Handles \(...\), \[...\], $...$, and $$...$$
+        let math = tex.trim();
+        if (math.startsWith('\\(') && math.endsWith('\\)')) math = math.slice(2, -2);
+        else if (math.startsWith('\\[') && math.endsWith('\\]')) math = math.slice(2, -2);
+        else if (math.startsWith('$') && math.endsWith('$')) {
+          if (math.startsWith('$$') && math.endsWith('$$')) math = math.slice(2, -2);
+          else math = math.slice(1, -1);
+        }
+
+        let styledTex = math.trim();
         if (!inline) {
-          styledTex = tex.startsWith('\\displaystyle') ? tex : `\\displaystyle{ ${tex} }`;
+          styledTex = styledTex.startsWith('\\displaystyle') ? styledTex : `\\displaystyle{ ${styledTex} }`;
         } else {
-          styledTex = tex.startsWith('\\textstyle') ? tex : `\\textstyle{ ${tex} }`;
+          styledTex = styledTex.startsWith('\\textstyle') ? styledTex : `\\textstyle{ ${styledTex} }`;
         }
 
         katex.render(styledTex, containerRef.current, {
@@ -824,7 +834,7 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                         {/* Main Content */}
                         <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'}`}>
                           {el.type === 'problem' ? (
-                            <MathText tex={content.startsWith('\\') || content.includes('=') || content.includes('^') ? content : `\\( ${content} \\)`} />
+                            <MathText tex={content} />
                           ) : (
                             <RichTextRenderer text={content} />
                           )}

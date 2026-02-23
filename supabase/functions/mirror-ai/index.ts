@@ -54,8 +54,9 @@ serve(async (req) => {
         
         CRITICAL RULES:
         1. **Math Formatting**: 
-           - 'problem' type: RAW LaTeX (e.g., "\\frac{x}{2} = 10"). No delimiters.
-           - 'word_problem' type: Text with \\( math \\).
+           - 'problem' type: RAW LaTeX (e.g., "\\frac{x}{2} = 10"). No delimiters like \( or $.
+           - 'word_problem' type: Text with math wrapped in \\( ... \\) delimiters.
+           - Ensure LaTeX is clean and compatible with KaTeX (e.g., use \\frac instead of / where possible).
         2. **STOP CONDITION**: Stop after the last visible printed problem. Ignore student handwriting/marks.
         3. **Title Extraction**: Ignore "Name/Date" lines. Find the central thematic title of the worksheet.
         
@@ -65,9 +66,9 @@ serve(async (req) => {
         ---ELEMENT---
         Type: header | section_header | problem | word_problem | instruction | diagram | response_area
         Box: [ymin, xmin, ymax, xmax] (0-1000 scale)
-        Content: [Original LaTeX/Text]
+        Content: [Raw LaTeX for problems, Text with \\( math \\) for others]
         Mirrored: [Mathematical Twin LaTeX/Text]
-        Solution: [Answer to Mirrored]
+        Solution: [Answer to Mirrored - use \\( math \\) for text-heavy solutions]
         SVG: [Minimal SVG string if diagram, else "N/A"]
         ---ELEMENT---
         ...
@@ -128,6 +129,9 @@ RULES:
         } else {
             throw new Error(`Unknown action: ${action} `);
         }
+
+        // Clean up the response: Strip Markdown code blocks if the AI included them
+        resultText = resultText.replace(/```(?:text|latex|json|markdown)?\n?([\s\S]*?)```/g, '$1').trim();
 
         return new Response(JSON.stringify({ data: resultText }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
