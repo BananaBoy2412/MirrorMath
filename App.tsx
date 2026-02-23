@@ -157,6 +157,36 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
 // Parses text with \( ... \) and \[ ... \] delimiters and renders mixed content
 // Parses text with \( ... \) and \[ ... \] delimiters and renders mixed content
 // Also converts underscore sequences (e.g. ___) into clean border-bottom lines
+// --- CONSTANTS & SHARED UTILS ---
+
+/**
+ * AUTO-FORMATTING HELPER: 
+ * Detects LaTeX/Math in text and ensures it's wrapped in \( ... \)
+ * Used primarily for Mirrorer parsing to ensure reliability.
+ */
+const autoFormatMath = (text: string): string => {
+  if (!text) return "";
+  let processed = text;
+
+  // 1. Already has delimiters? Skip wrapping if it looks balanced
+  const hasDelimiters = /\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\\begin\{.*?\}/.test(processed);
+  if (hasDelimiters) return processed;
+
+  // 2. Wrap chunks that look like math but lack delimiters
+  // This detects:
+  // - LaTeX commands starting with \ (e.g. \frac, \sqrt, \alpha)
+  // - Expressions with common operators (+, -, *, =, ^, _, <, >, ≤, ≥)
+  // - Algebraic terms like 2x, x^2, y_1
+  // - Fractions like 1/2 or expressions like (x+1)/(x-1)
+  return processed.replace(/(\\[a-zA-Z]+(?:\[[^[\]]*\])?(?:\{[^{}]*\}|\s*[\^_](?:\{[^{}]*\}|[a-zA-Z0-9]+)|\s+)*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z][\^_][a-zA-Z0-9]+|(?:\([^()]+\))\s*[=<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\))))/g, (match) => {
+    // Skip if it's just a common word or standalone number
+    if (!/[\\]|[\^_{}=/*+\-<>]/.test(match) && match.length < 2) return match;
+
+    // Heuristic: If it's a known math pattern but missing delimiters, wrap it
+    return ` \\(${match.trim()}\\) `;
+  }).replace(/\s+/g, ' ').trim();
+};
+
 const RichTextRenderer: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => {
   if (!text) return null;
 
@@ -1584,11 +1614,17 @@ const MirrorWorkspace: React.FC<{
 
         const type = getField('Type') || 'problem';
         const boxStr = getField('Box');
-        const content = getField('Content');
-        const mirrored = getField('Mirrored');
-        const solution = getField('Solution');
+        let content = getField('Content');
+        let mirrored = getField('Mirrored');
+        let solution = getField('Solution');
         const skill = getField('Skill') || 'Math Reflection';
         const svgContent = getField('SVG');
+
+        // Apply robust auto-formatting for math content
+        // This ensures math is rendered even if the AI forgot delimiters
+        content = autoFormatMath(content);
+        mirrored = autoFormatMath(mirrored || content);
+        solution = solution !== 'N/A' ? autoFormatMath(solution) : '';
 
         let boundingBox: [number, number, number, number] = [0, 0, 0, 0];
         if (boxStr) {
@@ -2006,28 +2042,7 @@ const GeneratorWorkspace: React.FC<{ onCreate: (worksheet: Worksheet) => Promise
       const effectiveRowHeight = Math.max(rowHeight, minRowHeight);
       const contentZoneHeight = effectiveRowHeight * 0.4;
 
-      // --- AUTO-FORMATTING HELPER ---
-      // Detects LaTeX/Math in text and ensures it's wrapped in \( ... \)
-      const autoFormatMath = (text: string): string => {
-        let processed = text;
-
-        // 1. Already has delimiters? Skip wrapping if it looks balanced
-        const hasDelimiters = /\\\(.*?\\\)|\\\[.*?\\\]/.test(processed);
-        if (hasDelimiters) return processed;
-
-        // 2. Wrap math-y chunks
-        // Expanded regex to capture commands with subscripts/superscripts (e.g. \sum_{n=1}) and standard operations
-        return processed.replace(/(\\[a-zA-Z]+(?:\[[^[\]]*\])?(?:\{[^{}]*\}|\s*[\^_](?:\{[^{}]*\}|[a-zA-Z0-9]+)|\s+)*|[\d]+[\d+=\-/*()^._<>!]*[\d]+|[\d+=\-/*()^._<>!]{2,})/g, (match) => {
-          // Skip if it's just a number without any operators or LaTeX
-          if (!/[\\]|[\^_{}=/*+]/.test(match)) return match;
-
-          // Heuristic: If it ends with space, trim it to avoid eating into next word
-          // trimming match.trim() is already done below, but the regex might consume leading/trailing space if \s+ matched.
-          // The regex allows \s+ inside the command structure (for \sum _...), which is good.
-
-          return ` \\(${match.trim()}\\) `;
-        });
-      };
+      // (Global autoFormatMath utility is used)
 
       data.problems.forEach((prob, idx) => {
         const numId = `q${idx}`;

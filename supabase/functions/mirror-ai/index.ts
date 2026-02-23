@@ -54,9 +54,10 @@ serve(async (req) => {
         
         CRITICAL RULES:
         1. **Math Formatting**: 
-           - 'problem' type: RAW LaTeX (e.g., "\\frac{x}{2} = 10"). No delimiters like \( or $.
-           - 'word_problem' type: Text with math wrapped in \\( ... \\) delimiters.
-           - Ensure LaTeX is clean and compatible with KaTeX (e.g., use \\frac instead of / where possible).
+           - **STRICT REQUIREMENT**: Provide RAW LaTeX ONLY. 
+           - **DO NOT** use delimiters like \\( ... \\), $ ... $, or \\[ ... \\].
+           - Formatting should be clean and compatible with KaTeX (e.g., use \\frac instead of /).
+           - Example: "x^2 + y = 10" instead of "\\( x^2 + y = 10 \\)".
         2. **STOP CONDITION**: Stop after the last visible printed problem. Ignore student handwriting/marks.
         3. **Title Extraction**: Ignore "Name/Date" lines. Find the central thematic title of the worksheet.
         
@@ -66,9 +67,9 @@ serve(async (req) => {
         ---ELEMENT---
         Type: header | section_header | problem | word_problem | instruction | diagram | response_area
         Box: [ymin, xmin, ymax, xmax] (0-1000 scale)
-        Content: [Raw LaTeX for problems, Text with \\( math \\) for others]
-        Mirrored: [Mathematical Twin LaTeX/Text]
-        Solution: [Answer to Mirrored - use \\( math \\) for text-heavy solutions]
+        Content: [Raw LaTeX / Text without delimiters]
+        Mirrored: [Raw LaTeX / Text without delimiters]
+        Solution: [Raw LaTeX / Text without delimiters]
         SVG: [Minimal SVG string if diagram, else "N/A"]
         ---ELEMENT---
         ...
