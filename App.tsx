@@ -201,12 +201,12 @@ const SmartMathRenderer: React.FC<{ text: string; className?: string; safe?: boo
   if (!text) return null;
 
   // 1. TOKENIZATION ENGINE
-  // Safe mode only identifies explicit delimiters and underscores
-  const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g;
+  // Safe mode only identifies explicit delimiters, environments, and underscores
+  const delimitedRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+)/g;
 
   // Professional-grade regex for mixed academic content identification (Identify-First)
-  // Refined to correctly group LaTeX commands with their suffixes (arguments, subscripts, superscripts)
-  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{[^{}]*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{[^{}]*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
+  // Refined to support LaTeX environments and group commands with their suffixes
+  const professionalRegex = /(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\begin\{[a-zA-Z\*]+\}[\s\S]*?\\end\{[a-zA-Z\*]+\}|__+|\\(?:[a-zA-Z]+)(?:\s*(?:[\^_{](?:\{[^{}]*\}|[a-zA-Z0-9.\-]+|\\infty)|(?:\{[^{}]*\}|\[[^[\]]*\])))*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g;
 
   const tokenRegex = safe ? delimitedRegex : professionalRegex;
   const parts = text.split(tokenRegex);
