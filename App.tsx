@@ -46,7 +46,7 @@ import {
 import { motion, AnimatePresence, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 import * as htmlToImage from 'html-to-image';
-import katex from 'katex';
+// import katex from 'katex'; // We'll use the CDN version from window for maximum reliability
 import 'katex/dist/katex.min.css';
 import html2canvas from 'html2canvas';
 
@@ -132,6 +132,14 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
           styledTex = styledTex.startsWith('\\textstyle') ? styledTex : `\\textstyle{ ${styledTex} }`;
         }
 
+        // Use global KaTeX from window (loaded via CDN in index.html)
+        const katex = (window as any).katex;
+        if (!katex) {
+          console.error("KaTeX not found on window");
+          if (containerRef.current) containerRef.current.innerHTML = tex;
+          return;
+        }
+
         katex.render(styledTex, containerRef.current, {
           throwOnError: true,
           displayMode: false,
@@ -179,17 +187,19 @@ const autoFormatMath = (text: string): string => {
   if (!text) return "";
   let processed = text;
 
-  // 1. Already has delimiters? Skip wrapping if it looks balanced
-  const hasDelimiters = /\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\\begin\{.*?\}/.test(processed);
-  if (hasDelimiters) return processed;
+  // 1. Process the text to identify math patterns
+  // We no longer skip if delimiters are present, because we want to catch "naked" math 
+  // that might be mixed with already-delimited math.
 
   // 2. Wrap chunks that look like math but lack delimiters
   // This detects:
-  // - LaTeX commands starting with \ (e.g. \frac, \sqrt)
-  // - Expressions with common operators (+, -, *, =, ^, _, <, >, ≤, ≥)
   // - Algebraic terms like 2x, x^2, y_1, dy/dx
+  // - Derivatives like dy/dz or da/dk
   // Improved regex: Includes common math characters and ensures we don't wrap plain words.
-  return processed.replace(/(\\[a-zA-Z]+(?:\[[^[\]]*\])?(?:\{[^{}]*\}|\s*[\^_](?:\{[^{}]*\}|[a-zA-Z0-9]+)|\s+)*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z][\^_][a-zA-Z0-9]+|(?:\([^()]+\))\s*[=<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+\/[\d.]+|[a-zA-Z]\b\s*=\s*[\d.]+|[\d.]+\s*=\s*[a-zA-Z]\b|\b[a-zA-Z]\b[\^_{][a-zA-Z0-9]+)/g, (match) => {
+  return processed.replace(/(\\[a-zA-Z]+(?:\[[^[\]]*\])?(?:\{[^{}]*\}|\s*[\^_](?:\{[^{}]*\}|[a-zA-Z0-9]+)|\s+)*|(?:\b[a-zA-Z]\b|[\d.]+)\s*[\^_{}=/*+\-<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+[\d+=\-/*()^._<>!≤≥]*[\d.]+|[a-zA-Z][\^_][a-zA-Z0-9]+|(?:\([^()]+\))\s*[=<>!≤≥]\s*(?:(?:\b[a-zA-Z]\b|[\d.]+)|(?:\([^()]+\)))|[\d.]+\/[\d.]+|[a-zA-Z]\b\s*=\s*[\d.]+|[\d.]+\s*=\s*[a-zA-Z]\b|\b[a-zA-Z]\b[\^_{][a-zA-Z0-9]+|[a-zA-Z]\b\/[a-zA-Z]\b)/g, (match) => {
+    // Skip if it is a common word in the context of instructions
+    if (/^(Find|when|and|Assume|both|are|of|the|is|if|for|with|in|to|on|at|by)$/i.test(match.trim())) return match;
+
     // Skip if it's just a common word or standalone number
     if (!/[\\]|[\^_{}=/*+\-<>\/]/.test(match) && match.length < 2) return match;
 
@@ -201,47 +211,57 @@ const autoFormatMath = (text: string): string => {
 const RichTextRenderer: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => {
   if (!text) return null;
 
-  // FAIL-SAFE: Ensure all math in the text is properly delimited before rendering
-  // This handles AI output that mixes text and raw LaTeX without delimiters.
-  const formattedText = autoFormatMath(text);
-
-  // Split by LaTeX delimiters (\( \), \[ \]), Double Dollar ($$ $$), Single Dollar ($ $), and underscore sequences (2 or more)
+  // Split by existing LaTeX delimiters (\( \), \[ \]), Double Dollar ($$ $$), Single Dollar ($ $), and underscore sequences (2 or more)
   // CRITICAL FIX: Use [\s\S] instead of . to match newlines in LaTeX blocks
-  const parts = formattedText.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g);
+  const initialParts = text.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g);
 
   return (
     <span className={className}>
-      {parts.map((part, index) => {
+      {initialParts.map((part, index) => {
         const trimmed = part.trim();
-        // Check for common LaTeX delimiters
+        // 1. If it's already a delimited math block, render it
         if (
           (trimmed.startsWith('\\(') && trimmed.endsWith('\\)')) ||
           (trimmed.startsWith('\\[') && trimmed.endsWith('\\]')) ||
           (trimmed.startsWith('$$') && trimmed.endsWith('$$')) ||
           (trimmed.startsWith('$') && trimmed.endsWith('$'))
         ) {
-          return <MathText key={index} tex={trimmed} inline={!(trimmed.includes('\\[') || trimmed.includes('$$'))} />;
+          return <MathText key={`math-${index}`} tex={trimmed} inline={!(trimmed.includes('\\[') || trimmed.includes('$$'))} />;
         }
 
+        // 2. If it's an underscore line, render it
         if (part.startsWith('__')) {
-          // Identify underscores and replace with a professional line
-          // width: ~8px per underscore
           return (
             <span
-              key={index}
+              key={`line-${index}`}
               className="border-b-2 border-slate-300 mx-1"
               style={{
                 width: `${part.length * 8}px`,
                 minWidth: '40px',
                 display: 'inline-block',
-                verticalAlign: 'baseline', // CRITICAL FIX: Aligns with text bottom
-                marginBottom: '-2px'       // Fine-tuned to sit EXACTLY on baseline
+                verticalAlign: 'baseline',
+                marginBottom: '-2px'
               }}
             />
           );
         }
-        // Render regular text, unescaping \$ back to $
-        return <span key={index}>{part.replace(/\\(\$)/g, '$')}</span>;
+
+        // 3. Otherwise, it's plain text - run autoFormatMath on it to catch "naked" math
+        const formatted = autoFormatMath(part);
+        const subParts = formatted.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
+
+        return subParts.map((subPart, subIndex) => {
+          const subTrimmed = subPart.trim();
+          if (
+            (subTrimmed.startsWith('\\(') && subTrimmed.endsWith('\\)')) ||
+            (subTrimmed.startsWith('\\[') && subTrimmed.endsWith('\\]')) ||
+            (subTrimmed.startsWith('$$') && subTrimmed.endsWith('$$')) ||
+            (subTrimmed.startsWith('$') && subTrimmed.endsWith('$'))
+          ) {
+            return <MathText key={`sub-math-${index}-${subIndex}`} tex={subTrimmed} inline={!(subTrimmed.includes('\\[') || subTrimmed.includes('$$'))} />;
+          }
+          return <span key={`text-${index}-${subIndex}`}>{subPart.replace(/\\(\$)/g, '$')}</span>;
+        });
       })}
     </span>
   );
