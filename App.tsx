@@ -880,9 +880,11 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
           </div>
 
           {/* 2. PROBLEMS LIST */}
-          {sortedElements
-            .filter(el => el.type !== 'header' && el.type !== 'section_header') // Filter out detected headers to avoid dupes
-            .map((el, idx) => (
+          {(() => {
+            const flowElements = sortedElements.filter(el => el.type !== 'header' && el.type !== 'section_header');
+            let problemCounter = 0;
+
+            return flowElements.map((el, idx) => (
 
               <div key={el.id || idx} className="w-full relative">
                 {/* Standard Element Rendering for Flow */}
@@ -896,7 +898,10 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                       {/* Question Number or Auto-Numbering for Problems */}
                       {(el.type === 'problem' || el.type === 'word_problem' || el.type === 'question_number') && (
                         <div className="text-sky-600 font-bold text-xl min-w-[2.5rem] pt-1">
-                          {el.type === 'question_number' ? content.replace('.', '') : (idx + 1)}.
+                          {el.type === 'question_number' ? content.replace('.', '') : (() => {
+                            problemCounter++;
+                            return problemCounter;
+                          })()}.
                         </div>
                       )}
 
@@ -936,7 +941,8 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                   );
                 })()}
               </div>
-            ))}
+            ));
+          })()}
         </div>
       ) : (
         // --- ABSOLUTE LAYOUT (Legacy / Generator) ---
@@ -1449,13 +1455,13 @@ const DetailView: React.FC<{ worksheet: Worksheet; onBack: () => void }> = ({ wo
                     <div className="space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Original Logic</h4>
                       <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic">
-                        <RichTextRenderer text={el.content || ""} className="text-slate-600 dark:text-slate-300" />
+                        <SmartMathRenderer text={el.content || ""} className="text-slate-600 dark:text-slate-300" />
                       </div>
                     </div>
                     <div className="space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-widest text-sky-500">Mirrored Reflection</h4>
                       <div className="p-5 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl text-slate-800 dark:text-white font-bold text-lg leading-relaxed shadow-sm">
-                        <RichTextRenderer text={el.mirroredContent || ""} className="dark:text-slate-200" />
+                        <SmartMathRenderer text={el.mirroredContent || ""} className="dark:text-slate-200" />
                       </div>
                     </div>
                   </div>
