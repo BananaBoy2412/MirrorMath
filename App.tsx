@@ -98,51 +98,90 @@ interface Worksheet {
 import { supabase } from './src/lib/supabase';
 
 // --- Shared Components ---
+
+/**
+ * GLOBAL SELF-HEALING MATH ENGINE
+ * Automatically corrects common AI 'hallucinations' and formatting errors.
+ * Ensures high-fidelity rendering even when output is inconsistent.
+ */
+const selfHealMath = (tex: string): string => {
+  if (!tex) return "";
+  let math = tex.trim();
+
+  // 1. DELIMITER SANITIZATION (Aggressive)
+  // Strip all common LaTeX/Math delimiters from start/end
+  while (
+    (math.startsWith('\\(') && math.endsWith('\\)')) ||
+    (math.startsWith('\\[') && math.endsWith('\\]')) ||
+    (math.startsWith('$$') && math.endsWith('$$')) ||
+    (math.startsWith('$') && math.endsWith('$'))
+  ) {
+    if (math.startsWith('\\(')) math = math.slice(2, -2).trim();
+    else if (math.startsWith('\\[')) math = math.slice(2, -2).trim();
+    else if (math.startsWith('$$')) math = math.slice(2, -2).trim();
+    else if (math.startsWith('$')) math = math.slice(1, -1).trim();
+  }
+
+  // 2. ENVIRONMENT NORMALIZATION
+  // KaTeX does not support 'tabular', only 'array'
+  math = math
+    .replace(/\\begin\{tabular\}/gi, '\\begin{array}')
+    .replace(/\\end\{tabular\}/gi, '\\end{array}');
+
+  // 3. COMMAND SPACING & BRACE FIXES
+  // AI often puts spaces after command names, which breaks LaTeX
+  math = math
+    .replace(/\\frac\s*\{/g, '\\frac{')
+    .replace(/\\sqrt\s*\{/g, '\\sqrt{')
+    .replace(/\^\s*\{/g, '^{')
+    .replace(/_\s*\{/g, '_{');
+
+  // AI sometimes omits braces for simple commands
+  math = math.replace(/\\sqrt\s+([a-zA-Z0-9]+)/g, '\\sqrt{$1}');
+  math = math.replace(/\\frac\s+([a-zA-Z0-9]+)\s+([a-zA-Z0-9]+)/g, '\\frac{$1}{$2}');
+
+  // 4. ESCAPING CLEANUP
+  math = math
+    .replace(/\\\\?\$/g, '$')
+    .replace(/\\\\?%/g, '%')
+    .replace(/\\\\?&/g, '&')
+    .replace(/\\\\?_/g, '_')
+    .replace(/\\\\?\{/g, '{')
+    .replace(/\\\\?\}/g, '}');
+
+  // 5. UNICODE FALLBACKS
+  const unicodeMap: Record<string, string> = {
+    '∫': '\\int ', '∑': '\\sum ', '√': '\\sqrt ', '∞': '\\infty ',
+    'α': '\\alpha ', 'β': '\\beta ', 'π': '\\pi ', 'θ': '\\theta ',
+    '±': '\\pm ', '≤': '\\le ', '≥': '\\ge ', '≠': '\\ne ',
+    '≈': '\\approx ', '×': '\\times ', '÷': '\\div ', '…': '\\dots '
+  };
+  Object.entries(unicodeMap).forEach(([char, latex]) => {
+    math = math.split(char).join(latex);
+  });
+
+  // 6. TRIG & LOG POLISH
+  // AI often forgets backslash for common functions
+  const trigFuncs = ['sin', 'cos', 'tan', 'log', 'ln', 'cot', 'sec', 'csc', 'lim'];
+  trigFuncs.forEach(func => {
+    const regex = new RegExp(`([^\\\\a-zA-Z])${func}([^a-zA-Z])`, 'g');
+    math = math.replace(regex, `$1\\${func}$2`);
+    if (math.startsWith(func)) math = `\\${func}${math.slice(func.length)}`;
+  });
+
+  // 7. CALCULUS POLISH
+  // Ensure 'dx', 'dy' etc have a small space before them in integrals
+  math = math.replace(/([^\\])d([xyzuvw])/g, '$1\\,d$2');
+
+  return math.trim();
+};
 const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> = ({ tex, className = "", inline = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (containerRef.current) {
       try {
-        // Robustness: Strip delimiters if they were accidentally passed in
-        // Handles \(...\), \[...\], $...$, and $$...$$
-        let math = tex.trim();
-
-        // Robustness: Pre-process common Unicode symbols AI might return into LaTeX
-        // This is a safety layer for "Identify-First" logic
-        // Robustness: Translate tabular (not supported by KaTeX) to array (supported)
-        // Robustness: Translate tabular (not supported by KaTeX) to array (supported)
-        math = math
-          .replace(/\\begin\{tabular\}/gi, '\\\\begin{array}')
-          .replace(/\\end\{tabular\}/gi, '\\\\end{array}')
-          .replace(/\\\\\$/g, '$'); // Unescape dollar signs
-
-        // Safety: Ensure common Unicode math symbols are treated correctly
-        math = math
-          .replace(/∫/g, '\\\\int ')
-          .replace(/∑/g, '\\\\sum ')
-          .replace(/√/g, '\\\\sqrt ')
-          .replace(/∞/g, '\\\\infty ')
-          .replace(/α/g, '\\\\alpha ')
-          .replace(/β/g, '\\\\beta ')
-          .replace(/π/g, '\\\\pi ')
-          .replace(/θ/g, '\\\\theta ')
-          .replace(/±/g, '\\\\pm ')
-          .replace(/≤/g, '\\\\le ')
-          .replace(/≥/g, '\\\\ge ')
-          .replace(/≠/g, '\\\\ne ');
-
-        while (
-          (math.startsWith('\\(') && math.endsWith('\\)')) ||
-          (math.startsWith('\\[') && math.endsWith('\\]')) ||
-          (math.startsWith('$$') && math.endsWith('$$')) ||
-          (math.startsWith('$') && math.endsWith('$'))
-        ) {
-          if (math.startsWith('\\(')) math = math.slice(2, -2).trim();
-          else if (math.startsWith('\\[')) math = math.slice(2, -2).trim();
-          else if (math.startsWith('$$') && math.endsWith('$$')) math = math.slice(2, -2).trim();
-          else if (math.startsWith('$')) math = math.slice(1, -1).trim();
-        }
+        const math = selfHealMath(tex);
 
         let styledTex = math.trim();
         // Fallback for empty math
@@ -232,8 +271,8 @@ const SmartMathRenderer: React.FC<{ text: string; className?: string; safe?: boo
       if (match.startsWith('__')) {
         tokens.push({ type: 'line', content: match });
       } else {
-        // It's math (either delimited or naked)
-        tokens.push({ type: 'math', content: match });
+        const healed = selfHealMath(match);
+        tokens.push({ type: 'math', content: healed });
       }
     }
   });
