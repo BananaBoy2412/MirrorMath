@@ -107,11 +107,15 @@ const MathText: React.FC<{ tex: string; className?: string; inline?: boolean }> 
         // Robustness: Strip delimiters if they were accidentally passed in
         // Handles \(...\), \[...\], $...$, and $$...$$
         let math = tex.trim();
-        if (math.startsWith('\\(') && math.endsWith('\\)')) math = math.slice(2, -2);
-        else if (math.startsWith('\\[') && math.endsWith('\\]')) math = math.slice(2, -2);
-        else if (math.startsWith('$') && math.endsWith('$')) {
-          if (math.startsWith('$$') && math.endsWith('$$')) math = math.slice(2, -2);
-          else math = math.slice(1, -1);
+        while (
+          (math.startsWith('\\(') && math.endsWith('\\)')) ||
+          (math.startsWith('\\[') && math.endsWith('\\]')) ||
+          (math.startsWith('$') && math.endsWith('$'))
+        ) {
+          if (math.startsWith('\\(')) math = math.slice(2, -2).trim();
+          else if (math.startsWith('\\[')) math = math.slice(2, -2).trim();
+          else if (math.startsWith('$$') && math.endsWith('$$')) math = math.slice(2, -2).trim();
+          else if (math.startsWith('$')) math = math.slice(1, -1).trim();
         }
 
         let styledTex = math.trim();
@@ -190,20 +194,29 @@ const autoFormatMath = (text: string): string => {
 const RichTextRenderer: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => {
   if (!text) return null;
 
-  // Split by LaTeX delimiters and underscore sequences (2 or more)
+  // Split by LaTeX delimiters (\( \), \[ \]), Double Dollar ($$ $$), Single Dollar ($ $), and underscore sequences (2 or more)
   // CRITICAL FIX: Use [\s\S] instead of . to match newlines in LaTeX blocks
-  const parts = text.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|__+)/g);
+  const parts = text.split(/(\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|__+)/g);
 
   return (
     <span className={className}>
       {parts.map((part, index) => {
-        if (part.startsWith('\\(') && part.endsWith('\\)')) {
-          const mathContent = part.slice(2, -2);
+        const trimmed = part.trim();
+        if (trimmed.startsWith('\\(') && trimmed.endsWith('\\)')) {
+          const mathContent = trimmed.slice(2, -2);
           return <MathText key={index} tex={mathContent} inline={true} />;
         }
-        if (part.startsWith('\\\[') && part.endsWith('\\\]')) {
-          const mathContent = part.slice(2, -2);
+        if (trimmed.startsWith('\\\[') && trimmed.endsWith('\\\]')) {
+          const mathContent = trimmed.slice(2, -2);
           return <MathText key={index} tex={mathContent} inline={false} />;
+        }
+        if (trimmed.startsWith('$$') && trimmed.endsWith('$$')) {
+          const mathContent = trimmed.slice(2, -2);
+          return <MathText key={index} tex={mathContent} inline={false} />;
+        }
+        if (trimmed.startsWith('$') && trimmed.endsWith('$')) {
+          const mathContent = trimmed.slice(1, -1);
+          return <MathText key={index} tex={mathContent} inline={true} />;
         }
         if (part.startsWith('__')) {
           // Identify underscores and replace with a professional line
@@ -863,11 +876,7 @@ const WorksheetPreview = forwardRef<HTMLDivElement, { elements: LayoutElement[];
                       <div className="flex-1 space-y-2">
                         {/* Main Content */}
                         <div className={`text-lg leading-relaxed ${el.type === 'problem' ? 'font-serif text-slate-900 text-xl' : 'text-slate-800'}`}>
-                          {el.type === 'problem' ? (
-                            <MathText tex={content} />
-                          ) : (
-                            <RichTextRenderer text={content} />
-                          )}
+                          <RichTextRenderer text={content} />
                         </div>
 
                         {/* SVG or Diagram Rendering */}
